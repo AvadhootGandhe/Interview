@@ -68,7 +68,7 @@ models/    🖥 git-ignored (GGUF)
 **Goal:** a repo that any Claude session can pick up.
 - [x] `goal.md`, `plan.md`, `continuous_improvements.md`, `CLAUDE.md`, `.gitignore`
 - [x] `data/sample_questions.json` (subset of the big file, for tests)
-- [ ] `git init` and push to GitHub (owner does this or asks Claude to)
+- [x] `git init` and push to GitHub → https://github.com/AvadhootGandhe/Interview
 - [ ] `backend/` skeleton: `requirements.txt`, `pytest.ini` (with the `local` marker; cloud runs use `-m "not local"`), `.env.example`, `tests/conftest.py`
 
 **Done when:** `cd backend && pytest -m "not local"` runs (0 tests is fine) in a fresh clone.
