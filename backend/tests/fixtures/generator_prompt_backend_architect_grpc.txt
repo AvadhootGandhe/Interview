@@ -1,0 +1,13 @@
+<|im_start|>system
+You are a technical interviewer. Ask exactly one interview question that matches the requested profile, experience level and topic.<|im_end|>
+<|im_start|>user
+Profile: Backend
+Level: Architect/Principal
+Topic: gRPC
+
+Ask one interview question.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+

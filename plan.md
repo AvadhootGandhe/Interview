@@ -83,7 +83,8 @@ models/    🖥 git-ignored (GGUF)
 - [x] `goal.md`, `plan.md`, `continuous_improvements.md`, `CLAUDE.md`, `.gitignore`
 - [x] `data/sample_questions.json` (subset of the big file, for tests)
 - [x] `git init` and push to GitHub → https://github.com/AvadhootGandhe/Interview
-- [ ] `backend/` skeleton: `requirements.txt`, `pytest.ini` (with the `local` marker; cloud runs use `-m "not local"`), `.env.example`, `tests/conftest.py`
+- [x] `backend/` skeleton: `requirements.txt`, `pytest.ini` (with the `local` marker; cloud runs use `-m "not local"`), `.env.example`, `tests/conftest.py`
+  - Note: in cloud sessions run `python3 -m pytest`; the bare `pytest` on PATH may be a separate install without `pytest-asyncio`.
 
 **Done when:** `cd backend && pytest -m "not local"` runs (0 tests is fine) in a fresh clone.
 
@@ -112,6 +113,12 @@ models/    🖥 git-ignored (GGUF)
 - ⚠ Training used `by_profile_level_topic.json`, which is not in the repo. Confirm its profile, level and topic names match the company file.
 
 **Done when:** the unit tests are green. 🖥 `check_model.py` prints sensible single questions in under 2 s each.
+
+**Status:**
+- [x] Unit tests written first, then `app/config.py`, `app/llm/local_client.py`, `app/agents/question_generator.py` (13 tests green). Prompt checked against the notebook and a byte-exact fixture.
+- [x] `scripts/check_model.py` (run with `python -m scripts.check_model` from `backend/`)
+- [ ] 🖥 Export GGUF in Colab, run `llama-server`, run `pytest -m local` and `check_model.py` (< 2 s per question)
+- [ ] 🖥 Confirm `by_profile_level_topic.json` profile/level/topic names match the company file
 
 ---
 
