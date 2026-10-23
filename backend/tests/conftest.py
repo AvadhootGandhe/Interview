@@ -66,3 +66,39 @@ def sample_questions_path() -> Path:
 @pytest.fixture
 def fixtures_dir() -> Path:
     return FIXTURES
+
+
+# --- Phase 2: an ingested sample database ----------------------------------
+
+@pytest.fixture(scope="session")
+def ingested_db_file(tmp_path_factory) -> Path:
+    """Ingest the sample once per run; each test gets its own copy."""
+    from app.db.session import make_engine
+    from scripts.ingest import ingest
+
+    path = tmp_path_factory.mktemp("db") / "sample.db"
+    engine = make_engine(f"sqlite:///{path}")
+    ingest(SAMPLE_QUESTIONS, engine)
+    engine.dispose()
+    return path
+
+
+@pytest.fixture
+def db_url(ingested_db_file, tmp_path) -> str:
+    import shutil
+
+    path = tmp_path / "test.db"
+    shutil.copy(ingested_db_file, path)
+    return f"sqlite:///{path}"
+
+
+@pytest.fixture
+def db(db_url):
+    from sqlalchemy.orm import Session
+
+    from app.db.session import make_engine
+
+    engine = make_engine(db_url)
+    with Session(engine) as session:
+        yield session
+    engine.dispose()
