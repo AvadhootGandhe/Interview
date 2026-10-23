@@ -1,0 +1,32 @@
+# Large local-only data and models (exceed GitHub 100MB limit)
+by_company_profile_level_topic.json
+by_profile_level_topic.json
+output_/
+models/
+*.gguf
+*.safetensors
+
+# Generated
+backend/*.db
+backend/data/*.db
+data/*.db
+data/followup_train.jsonl
+backend/audio_cache/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+
+# OS
+.DS_Store
