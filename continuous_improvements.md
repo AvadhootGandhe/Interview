@@ -69,6 +69,11 @@ Then start the loop again from step 1.
 | **Follow-up trigger accuracy:** follows up exactly when the label says the answer is weak | ≥ 90% | `run_evals.py` |
 | **Follow-up relevance:** a Claude judge rates whether the follow-up targets the actual gap (1–5) | ≥ 4.0 average | `run_evals.py` on `evals/followups.jsonl` |
 | **Generated question quality:** single question, on-topic, right level (judge 1–5) | ≥ 4.0 average | `run_evals.py --generator` 🖥 |
+| **Plan validity:** plans that pass checks without needing the fallback | 100% after fallback; ≥ 90% first try | `tests/test_planner.py`, `run_evals.py --flow` |
+| **Flow coherence:** a Claude judge rates whether the questions build naturally (1–5) | ≥ 4.0 average (G9) | `run_evals.py --flow` on `evals/sessions.jsonl` |
+| **Abrupt topic jumps** per interview | ≤ 1 (G9) | `run_evals.py --flow` |
+| **Company relevance:** a Claude judge rates whether the questions feel like this company (1–5) | ≥ 4.0 average (G10) | `run_evals.py --flow` |
+| **Pool hit rate:** mentioned terms that found a matching pool question for a bridge | Track it; if low, consider embeddings (Phase 7) | orchestrator logs |
 | Turn latency p50 / p95 | < 4 s / < 6 s (G4) | `bench_latency.py` 🖥 |
 | Claude cost per interview | Track it and don't let it creep up | API usage logs |
 | UI minimalism checklist | All pass | Screenshot review |
@@ -90,11 +95,13 @@ Every screen, in light **and** dark mode, at 1440 px and 390 px:
 2. **One improvement per loop.** Small and measurable beats big and vague.
 3. **`goal.md` is law.** To change a goal or constraint, propose it in the log and wait for the owner to approve it.
 4. **Don't break the training prompt** in `question_generator.py`. Changing it requires retraining the LoRA.
-5. **Cloud sessions** can't reach 🖥 items (the full dataset, GGUF, mic, Metal). Use `data/sample_questions.json` and fakes, and mark anything that needs the Mac with `@pytest.mark.local`.
-6. **Never commit** the 914 MB dataset, model weights, `.env` or API keys.
-7. Keep this file and `plan.md` current. The next session only knows what is written down.
+5. **No made-up questions in plans.** The planner and flow controller only pick ids from the retrieved pool. Keep the flow controller rule-based (no LLM) unless a measured improvement justifies the added latency.
+6. **Cloud sessions** can't reach 🖥 items (the full dataset, GGUF, mic, Metal). Use `data/sample_questions.json` and fakes, and mark anything that needs the Mac with `@pytest.mark.local`.
+7. **Never commit** the 914 MB dataset, model weights, `.env` or API keys.
+8. Keep this file and `plan.md` current. The next session only knows what is written down.
 
 ## Improvement Log
 | # | Date | Idea (one line) | Hypothesis → metric | Result (before → after) | Kept? | Next ideas |
 |---|------|-----------------|---------------------|-------------------------|-------|------------|
 | 0 | 2026-10-24 | Project docs created | — | — | — | Start Phase 0 skeleton → Phase 1 |
+| 1 | 2026-10-24 | Design: retrieval context pack + planner + flow controller (docs only) | Company-style, flowing interviews → G9, G10 | — (not built yet) | — | Build in Phase 2–3, tests first |

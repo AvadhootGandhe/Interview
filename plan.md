@@ -21,23 +21,37 @@
 ```
 Browser (Next.js)                        Backend (FastAPI)
  ├ /            setup (step by step) ─▶ GET  /catalog/*            ── SQLite
- ├ /interview/[id]  orb + mic      ─▶  POST /sessions               (pick questions, greeting)
+ ├ /interview/[id]  orb + mic      ─▶  POST /sessions               (retrieve → plan → greeting)
+ │                                        ├ Retriever      SQLite filters + FTS5 → question pool (≤40)
+ │                                        ├ CompanyProfile topic mix (SQL) + focus summary (Claude Haiku, cached)
+ │                                        ├ QuestionGenerator → llama-server (fine-tuned Qwen3-4B) 🖥 → extra pool items
+ │                                        └ Planner        → Claude: ordered interview plan (4–6 segments)
  │                                      POST /sessions/{id}/answer   audio|text
  │                                        ├ STT        mlx-whisper              🖥
  │                                        ├ Orchestrator (state machine, DB-backed)
  │                                        │   ├ Evaluator          → Claude (structured JSON)
- │                                        │   ├ QuestionGenerator  → llama-server (fine-tuned Qwen3-4B) 🖥
- │                                        │   └ Interviewer        → Claude (greeting / ask / follow-up / close)
+ │                                        │   ├ FlowController     rules only: harder/easier/bridge (no LLM)
+ │                                        │   └ Interviewer        → Claude + context pack (greeting / ask / follow-up / close)
  │  ◀── transcript, text, audio_url ──    └ TTS        Kokoro-82M               🖥
  └ /report/[id] ◀───────────────────── GET  /sessions/{id}/report  → Reporter (Claude)
 ```
 
 **Interview loop:**
-1. GREETING.
-2. For each question `q_i`, ASK.
-3. The user answers. EVALUATE produces `{satisfaction 0–100, scores{correctness, depth, clarity, communication}, covered_points[], missing_points[], follow_up_focus, red_flags[]}`.
-4. If `satisfaction < THRESHOLD (70)` and `follow_ups < MAX_FOLLOWUPS (2)`, ask a FOLLOW_UP on `follow_up_focus` and go back to step 3. Otherwise move to the next question.
-5. After N questions (5) or the time limit: CLOSING, then REPORT.
+1. **RETRIEVE.** Build the **context pack**:
+   - company profile;
+   - profile and level expectations;
+   - question pool: up to 40 dataset questions plus fine-tuned generated questions for the likely topics;
+   - each item tagged with id, topic and difficulty estimate.
+2. **PLAN.** The planner turns the pack into 4–6 ordered segments: warm-up → core concepts → deeper scenario/design → stretch. Related topics sit next to each other, and difficulty rises with level. This runs while the greeting plays.
+3. GREETING.
+4. For each segment, ASK. The interviewer gets the segment theme, its question, 3 similar retrieved questions as style examples, the company profile, and the bridge note, then speaks a natural transition followed by the question.
+5. The user answers. EVALUATE produces `{satisfaction 0–100, scores{correctness, depth, clarity, communication}, covered_points[], missing_points[], follow_up_focus, mentioned_terms[], red_flags[]}`.
+6. If `satisfaction < THRESHOLD (70)` and `follow_ups < MAX_FOLLOWUPS (2)`, ask a FOLLOW_UP on `follow_up_focus` and go back to step 5.
+7. **FLOW.** When a question is finished, the flow controller adjusts the *next* segment (rules only, no LLM call):
+   - score ≥ 85 → harder question on the same theme from the pool;
+   - score ≤ 50 → easier one;
+   - a `mentioned_terms` FTS match against an upcoming pool question → swap that question in and add a **bridge** note ("they mentioned Redis").
+8. After the last segment or the time limit: CLOSING, then REPORT.
 
 The final score for a question is its last satisfaction score minus `FOLLOWUP_PENALTY (5)` for each follow-up it needed. All numbers live in `backend/app/config.py` and can be overridden from `.env`.
 
@@ -48,12 +62,12 @@ data/sample_questions.json
 backend/
   app/main.py  app/config.py
   app/api/{catalog,sessions}.py
-  app/agents/{base,question_generator,interviewer,evaluator,reporter,orchestrator}.py
+  app/agents/{base,question_generator,planner,interviewer,evaluator,reporter,orchestrator}.py
   app/llm/{local_client,claude_client}.py
   app/speech/{stt,tts}.py
-  app/services/question_picker.py
+  app/services/{retriever,company_profile,context_pack,flow}.py
   app/db/{models,session}.py
-  app/prompts/{interviewer,evaluator,reporter}.md
+  app/prompts/{planner,interviewer,evaluator,reporter,company_profile}.md
   scripts/{ingest,check_model,text_interview,run_evals,bench_latency}.py
   evals/answers.jsonl
   tests/  (conftest.py has fake LLM, STT and TTS fixtures, plus the `local` marker)
@@ -101,8 +115,8 @@ models/    🖥 git-ignored (GGUF)
 
 ---
 
-## Phase 2: Data ingest and question picker
-**Goal:** fast, filterable access to the questions.
+## Phase 2: Data ingest, retrieval (RAG) and company profiles
+**Goal:** fast, filterable access to the questions, and a **context pack** that gives Claude the company's real question style.
 
 **Tests first** (all run on `data/sample_questions.json`):
 - `tests/test_ingest.py`
@@ -112,28 +126,52 @@ models/    🖥 git-ignored (GGUF)
   - Question ids are parsed from the slug suffix.
   - Duplicate slugs are stored once.
   - Re-running ingest is idempotent.
-- `tests/test_question_picker.py`
-  - All filters are optional, and any combination returns N distinct questions.
-  - Questions are spread across topics when no topic is given.
-  - **Widening order:** drop company → General → drop level. It never returns 0 questions when the profile has any.
-  - It excludes questions from the user's recent sessions.
-  - Source mix: a selected company with matches gives dataset questions only; otherwise about `GENERATED_RATIO` of slots are generated (with a mocked generator).
-  - If the generator is unavailable, it falls back to the dataset.
+- `tests/test_retriever.py`
+  - All filters are optional; any combination returns a pool of up to `POOL_SIZE (40)` distinct questions.
+  - The pool covers several topics when no topic is given; no single topic exceeds 40% of it.
+  - **Widening order:** drop company → General → drop level. It never returns an empty pool when the profile has any questions.
+  - Excludes questions from the user's recent sessions.
+  - **FTS5:** `search("redis cache eviction", pool)` ranks caching questions first; `search("kafka")` finds queue/streaming questions; it returns `[]` (and doesn't crash) on stop-words or empty input.
+  - Each pool item carries `id, topic, text, source(dataset|generated), difficulty`. Difficulty is estimated from the level the question came from (Fresher = 1 … Architect = 5).
+- `tests/test_company_profile.py`
+  - The topic mix for `Amazon` on the sample data matches a hand-computed fixture, with percentages adding to 100.
+  - The summary is generated once (with a fake LLM) and then served from the `company_profiles` cache; a second call makes no LLM call.
+  - "General" or no company gives a neutral profile with no LLM call.
+- `tests/test_context_pack.py`
+  - The pack has company profile + level expectations + pool, and serializes under `MAX_CONTEXT_TOKENS (~3K)`, trimming the pool if needed.
+  - Generated items come from the generator (mocked); if the generator is down, the pack is dataset-only and still valid.
+  - A company with matches has ≥ 70% company-specific dataset items.
 - `tests/test_api_catalog.py`: `/catalog/companies?q=ama` finds Amazon; profiles, levels and topics are listed and sorted.
 
 **Implement:**
-- `app/db/models.py`: `companies`, `profiles`, `levels`, `topics(category: technical|behavioral|dsa)`, `questions`, `question_map` (indexed on the filter combinations), `sessions`, `turns`, `evaluations`.
-- `scripts/ingest.py`: streams with `ijson`, takes a `--source` path, and batches inserts. Includes `company_aliases.json` and the topic category list.
-- `app/services/question_picker.py` and `app/api/catalog.py`.
+- `app/db/models.py`: `companies`, `profiles`, `levels`, `topics(category: technical|behavioral|dsa)`, `questions`, `question_map` (indexed on the filter combinations), **`questions_fts` (FTS5 virtual table over question text)**, **`company_profiles(company_id, profile_id, level_id, topic_mix_json, summary, updated_at)`**, `sessions`, `turns`, `evaluations`, `plans`.
+- `scripts/ingest.py`: streams with `ijson`, takes a `--source` path, batches inserts, and builds the FTS index. Includes `company_aliases.json` and the topic category list.
+- `app/services/retriever.py`: `build_pool(filters, user_id) -> list[PoolItem]`, `search(terms, pool) -> list[PoolItem]`.
+- `app/services/company_profile.py`: topic mix by SQL, plus a 3–4 line focus/style summary from about 30 sample questions (Claude Haiku via `claude_client`), cached in the DB.
+- `app/services/context_pack.py`: builds the pack the planner and interviewer receive.
+- `app/api/catalog.py`.
 
-**Done when:** tests are green. 🖥 Full ingest finishes in under 15 min with about 131K questions and about 3.86M mappings. `Amazon / AI Engineer / Architect/Principal / AI Agents & Tool Calling` returns the expected questions.
+**Done when:** tests are green. 🖥 Full ingest finishes in under 15 min with about 131K questions and about 3.86M mappings. `Amazon / AI Engineer / Architect/Principal / AI Agents & Tool Calling` returns the expected pool, and FTS for "idempotency" returns relevant questions in under 50 ms.
 
 ---
 
-## Phase 3: Agents and orchestrator (text only)
-**Goal:** a complete interview in the terminal with real follow-up behaviour.
+## Phase 3: Agents, interview flow and orchestrator (text only)
+**Goal:** a complete interview in the terminal that **flows like a real interviewer**: questions build on each other, react to the candidate, and include real follow-ups.
 
 **Tests first** (LLMs faked with deterministic fixtures):
+- `tests/test_planner.py`
+  - A valid plan parses into the `InterviewPlan` Pydantic model: 4–6 segments, each with `theme, topic, difficulty 1–5, seed_question_id, link_from_previous`.
+  - **Rejects made-up ids:** every `seed_question_id` must exist in the pool.
+  - No repeated questions; segment 1 is a warm-up (difficulty ≤ level baseline); difficulty never jumps by more than 2 between segments.
+  - When a topic is given, ≥ 60% of segments use that topic, and the others are closely related topics.
+  - Invalid output → one retry → **fixed fallback plan** (sort the pool by topic group, then difficulty). The fallback itself always passes validation.
+  - The planner prompt contains the full context pack.
+- `tests/test_flow.py` (pure functions, no LLM)
+  - Final score ≥ 85 → the next segment's question becomes a harder pool question on the same theme (if one exists).
+  - Score ≤ 50 → an easier one.
+  - `mentioned_terms=["redis"]` with an FTS match on an upcoming segment → that question moves up to next, with `bridge="candidate mentioned Redis"`.
+  - It never picks an already-asked question and never changes more than the next segment.
+  - With no matching alternative, the plan stays as it was.
 - `tests/test_evaluator.py`
   - Parses valid structured output into the `Evaluation` Pydantic model.
   - Retries once on invalid output, then raises.
@@ -141,10 +179,13 @@ models/    🖥 git-ignored (GGUF)
   - The whole question thread is sent: the main answer plus earlier follow-ups.
 - `tests/test_interviewer.py`
   - Each mode (greeting, ask, follow_up, transition, closing) builds the right prompt.
+  - The **ask** prompt includes the segment theme, the seed question, 3 similar retrieved questions as style examples, the company profile summary, the bridge note when there is one, and a one-line summary of the last answer.
   - The follow-up prompt includes `follow_up_focus` and the missing points.
+  - The interviewer keeps the seed question's intent: a fake judge checks that the rephrased question is about the same thing.
   - Output is cleaned to plain speakable text: no markdown or lists, and at most about 60 words.
 - `tests/test_orchestrator.py` (core)
-  - Satisfaction 40 → follow-up. Satisfaction 85 → next question.
+  - Session start runs RETRIEVE → PLAN, saves the plan in `plans`, and greets.
+  - Satisfaction 40 → follow-up. Satisfaction 85 → next segment, with the flow controller applied.
   - The follow-up cap is respected (2), then it moves on.
   - The final score applies the penalty.
   - After N questions → CLOSING → state `done`.
@@ -153,15 +194,22 @@ models/    🖥 git-ignored (GGUF)
 - `tests/test_reporter.py`: the report has an overall score, a per-question list, strengths and gaps.
 - `tests/test_api_sessions.py`: create session → answer in text → … → report, through the FastAPI TestClient.
 - Eval set `evals/answers.jsonl`: about 30 labeled answers (strong, partial, weak, off-topic) across levels. `scripts/run_evals.py` reports the G3 metric. It needs the API key, so it is not part of the unit suite.
+- Eval set `evals/sessions.jsonl`: about 10 scripted candidate sessions across company, profile and level. `run_evals.py --flow` reports G9: plan validity, flow coherence (Claude judge, 1–5), company relevance (judge, 1–5) and abrupt topic jumps per interview.
 
 **Implement:**
 - `app/agents/base.py`: `Agent` protocol `async run(ctx) -> result`.
 - `app/llm/claude_client.py`: `anthropic` SDK. Model ids come from config: `claude-sonnet-5-5` by default for the evaluator, with `claude-haiku-5-5` as the cheaper option. Uses structured outputs for the evaluator. Check current SDK usage with the `claude-api` skill before writing it.
+- `app/agents/planner.py` (Claude, structured output into `InterviewPlan`, validated in code, with the fallback plan) and `app/prompts/planner.md`.
+- `app/services/flow.py`: `next_segment(plan, history, last_eval, pool) -> (segment, bridge|None)`. Pure function.
+- The evaluator also returns `mentioned_terms[]` (technologies and concepts the candidate brought up).
 - `evaluator.py`, `interviewer.py`, `reporter.py`, `orchestrator.py`, and prompts in `app/prompts/*.md`.
 - `app/api/sessions.py`: `POST /sessions`, `POST /sessions/{id}/answer` (`text` for now), `POST /sessions/{id}/end`, `GET /sessions/{id}/report`.
 - `scripts/text_interview.py`: an interview in the terminal.
 
-**Done when:** tests are green, G3 is at least 80% on the eval set, and a terminal interview with one deliberately weak answer triggers a relevant follow-up.
+**Done when:** tests are green, G3 is at least 80% on the eval set, G9 passes on `evals/sessions.jsonl`, and in a terminal interview:
+- one deliberately weak answer triggers a relevant follow-up;
+- mentioning a technology (for example, Redis) leads to a bridged next question;
+- the questions clearly build from warm-up to stretch.
 
 ---
 
@@ -213,13 +261,15 @@ models/    🖥 git-ignored (GGUF)
 - Error states: mic denied, model server down, API errors. Each gets a calm one-line message with a single retry.
 - `scripts/bench_latency.py` 🖥 records p50 and p95.
 
-**Done when:** G1–G8 are all met. **That completes the MVP.**
+**Done when:** G1–G10 are all met. **That completes the MVP.**
 
 ---
 
 ## Phase 7: Next (after the MVP)
 - [ ] **Behavioral track:** STAR rubric in the evaluator (situation, task, action, result, ownership, impact), behavioral topic set, follow-ups like "What was *your* specific role?"
 - [ ] **LoRA v2:** a new Colab notebook trained on multi-turn data (context + question + answer + evaluator gaps → follow-up), from `data/followup_train.jsonl` plus synthetic Claude conversations, `MAX_LEN` about 1024. Swap `interviewer.py` to it and A/B it against Claude on logged sessions.
+- [ ] **Semantic retrieval:** add small local embeddings (for example, bge-small, about 130 MB) with a numpy/sqlite-vec index, used together with FTS5. Only do this if the pool hit rate or the company relevance metric shows FTS is not enough.
+- [ ] Planner aware of the candidate's history: use earlier sessions' weak areas to shape new plans.
 - [ ] WebSocket streaming, a DSA code editor, auth, a history dashboard.
 
 ---
@@ -232,3 +282,7 @@ models/    🖥 git-ignored (GGUF)
 | 2026-10-24 | Local Whisper + Kokoro | Free, good quality, fits in RAM alongside the LLM |
 | 2026-10-24 | Technical screening before behavioral | Owner's choice |
 | 2026-10-24 | REST, not WebSocket, for the MVP | Simpler; streaming comes later |
+| 2026-10-24 | Retrieval (RAG) context pack: company profile + filtered question pool, given to the planner and interviewer | Claude asks in the company's real style instead of rewording one random question |
+| 2026-10-24 | FTS5 keyword search before embeddings | Built into SQLite, uses no extra RAM on the 8 GB Mac; embeddings only if the metrics need them |
+| 2026-10-24 | Planner (one Claude call at start) + rule-based flow controller between questions | Interview flows warm-up → stretch and reacts to answers, with no extra latency per turn |
+| 2026-10-24 | Generator prompt unchanged; company flavour comes from retrieval + Claude | The LoRA was trained without company input |
