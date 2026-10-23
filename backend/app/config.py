@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     llama_server_url: str = "http://127.0.0.1:8081"
     database_url: str = "sqlite:///./interview.db"
     fake_llm: bool = False
+    cors_origins: list[str] = ["http://localhost:3000"]
 
     # Question generator (must match how the LoRA was sampled in training)
     generator_temperature: float = 0.8

@@ -106,3 +106,4 @@ Every screen, in light **and** dark mode, at 1440 px and 390 px:
 | 0 | 2026-10-24 | Project docs created | — | — | — | Start Phase 0 skeleton → Phase 1 |
 | 1 | 2026-10-24 | Design: retrieval context pack + planner + flow controller (docs only) | Company-style, flowing interviews → G9, G10 | — (not built yet) | — | Build in Phase 2–3, tests first |
 | 2 | 2026-10-23 | Phase 0 backend skeleton + Phase 1 question generator (cloud-safe part) | Tests first → G8 | 0 → 13 tests green, 1 local test deselected | Yes | 🖥 GGUF export + live test; then Phase 2 ingest/retriever |
+| 3 | 2026-10-24 | Phase 2: ingest + FTS5, retriever with widening, company profile, context pack, catalog API (cloud-safe part) | Tests first → G5, G8, G10 | 13 → 119 tests green, 3 local tests deselected; sample ingest 0.2 s; packs ~1.5–2.4K tokens | Yes | 🖥 full ingest + `test_ingest_full_live.py`; Phase 3 planner/flow; watch pool size for companies with few exact matches |

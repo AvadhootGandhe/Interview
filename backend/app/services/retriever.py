@@ -69,6 +69,36 @@ def fts_query(terms: str | list[str]) -> str | None:
     return " OR ".join(f'"{w}"' for w in words) or None
 
 
+def _lookup(db: Session, model, name: str | None) -> int | None:
+    if not name:
+        return None
+    found = db.scalar(select(model.id).where(func.lower(model.name) == name.strip().lower()))
+    if found is None:
+        raise ValueError(f"unknown {model.__tablename__[:-1]}: {name!r}")
+    return found
+
+
+def company_id(db: Session, name: str | None) -> int | None:
+    """A real company's id; None for no company, General, junk or an unknown name."""
+    if not name or canonical_company(name) == GENERAL:
+        return None
+    return db.scalar(
+        select(Company.id).where(
+            func.lower(Company.name) == canonical_company(name).lower(), Company.is_general.is_(False)
+        )
+    )
+
+
+def resolve(db: Session, f: Filters) -> dict[str, int | None]:
+    """Filter names -> ids. Unknown profile/level/topic raise ValueError."""
+    return {
+        "company": company_id(db, f.company),
+        "profile": _lookup(db, Profile, f.profile),
+        "level": _lookup(db, Level, f.level),
+        "topic": _lookup(db, Topic, f.topic),
+    }
+
+
 class Retriever:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -79,7 +109,7 @@ class Retriever:
         self, filters: Filters, user_id: str | None = None, size: int | None = None
     ) -> list[PoolItem]:
         size = size or settings.pool_size
-        ids = self._resolve(filters)
+        ids = resolve(self.db, filters)
         recent = self._recent_question_ids(user_id)
         pool = self._fill(ids, recent, size)
         if not pool and recent:  # never empty: repeating beats asking nothing
@@ -100,30 +130,6 @@ class Retriever:
         return [by_id[qid] for qid in rows if qid in by_id]
 
     # --- internals -----------------------------------------------------------
-
-    def _id(self, model, name: str | None) -> int | None:
-        if not name:
-            return None
-        found = self.db.scalar(select(model.id).where(func.lower(model.name) == name.strip().lower()))
-        if found is None:
-            raise ValueError(f"unknown {model.__tablename__[:-1]}: {name!r}")
-        return found
-
-    def _resolve(self, f: Filters) -> dict[str, int | None]:
-        company_id = None
-        if f.company and canonical_company(f.company) != GENERAL:
-            company_id = self.db.scalar(
-                select(Company.id).where(
-                    func.lower(Company.name) == canonical_company(f.company).lower(),
-                    Company.is_general.is_(False),
-                )
-            )  # an unknown company simply means "no company"
-        return {
-            "company": company_id,
-            "profile": self._id(Profile, f.profile),
-            "level": self._id(Level, f.level),
-            "topic": self._id(Topic, f.topic),
-        }
 
     def _recent_question_ids(self, user_id: str | None) -> set[str]:
         if not user_id:

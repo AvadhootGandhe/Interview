@@ -160,6 +160,14 @@ models/    🖥 git-ignored (GGUF)
 
 **Done when:** tests are green. 🖥 Full ingest finishes in under 15 min with about 131K questions and about 3.86M mappings. `Amazon / AI Engineer / Architect/Principal / AI Agents & Tool Calling` returns the expected pool, and FTS for "idempotency" returns relevant questions in under 50 ms.
 
+**Status:**
+- [x] Tests written first, then `app/db/{models,session,names}.py`, `scripts/ingest.py`, `app/services/{retriever,company_profile,context_pack}.py`, `app/api/catalog.py`, `app/main.py`, `app/prompts/company_profile.md` (106 new tests; suite 119 green).
+- [x] Ingest: ijson streams one company at a time, `--source`/`--db`/`--batch-size`, `INSERT OR IGNORE` (idempotent), FTS5 with the porter tokenizer. Aliases live in `app/db/company_aliases.json`; the topic category list in `app/db/names.py`.
+- [x] Retriever: widening `exact → drop_company → general → drop_level → drop_topic → profile_only`; never empty; recent-session exclusion; ≤ 40% per topic; behavioral topics only when asked for.
+- [x] Company profile (topic mix by SQL, summary via an injected LLM client, cached in `company_profiles`) and context pack (≤ 3K tokens, generator fallback).
+- [ ] 🖥 Run the full ingest and `pytest -m local tests/test_ingest_full_live.py` (< 15 min, ~131K questions, ~3.86M mappings, FTS "idempotency" < 50 ms).
+- [ ] Wire the company-profile summary to `claude_client` (Claude Haiku) once it exists in Phase 3; tests use the FakeLLM.
+
 ---
 
 ## Phase 3: Agents, interview flow and orchestrator (text only)
@@ -293,3 +301,7 @@ models/    🖥 git-ignored (GGUF)
 | 2026-10-24 | FTS5 keyword search before embeddings | Built into SQLite, uses no extra RAM on the 8 GB Mac; embeddings only if the metrics need them |
 | 2026-10-24 | Planner (one Claude call at start) + rule-based flow controller between questions | Interview flows warm-up → stretch and reacts to answers, with no extra latency per turn |
 | 2026-10-24 | Generator prompt unchanged; company flavour comes from retrieval + Claude | The LoRA was trained without company input |
+| 2026-10-24 | Question id = slug suffix as a string (`"21834"`, DSA `"d1743"`) | DSA slugs end in `-d<n>`; the suffixes are unique in the sample |
+| 2026-10-24 | A company with ≥ 12 exact matches caps the widened share of its pool so ≥ 70% stays company-specific (pool can be < 40) | G10 (goal.md) wins; keeps the plan's widening order intact. Sparse companies widen freely (G5) |
+| 2026-10-24 | Behavioral topics (STAR, leadership) are left out of pools and the topic catalog unless chosen explicitly | MVP is technical screening only (goal.md Scope) |
+| 2026-10-24 | Company profile LLM failure → a one-line topic summary, not cached | The profile is optional context and must never block an interview |
