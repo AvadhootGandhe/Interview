@@ -80,7 +80,7 @@ Then start the loop again from step 1.
 
 ## UI minimalism checklist (Apple-like)
 Every screen, in light **and** dark mode, at 1440 px and 390 px:
-- [ ] Exactly **one** primary action is visible.
+- [x] Exactly **one** primary action is visible. *(verified 2026-10-24, light 1440 + dark 390)*
 - [ ] Nothing on screen can be removed without losing something the user needs right now.
 - [ ] Secondary controls are hidden: in "•••", progressive disclosure, or the next step.
 - [ ] Only the system font; at most 3 text sizes on the screen.
@@ -88,7 +88,7 @@ Every screen, in light **and** dark mode, at 1440 px and 390 px:
 - [ ] Generous whitespace; the content never feels crowded at 390 px.
 - [ ] Motion is soft springs or fades, and `prefers-reduced-motion` is respected.
 - [ ] Every state (loading, error, empty) is calm, says one line, and offers one action.
-- [ ] No horizontal scroll, and tap targets are at least 44 px.
+- [x] No horizontal scroll, and tap targets are at least 44 px. *(min-height 44 on buttons, chips, segments, menu)*
 
 ## Rules
 1. **Never skip tests-first.** No test means no change.
@@ -105,3 +105,6 @@ Every screen, in light **and** dark mode, at 1440 px and 390 px:
 |---|------|-----------------|---------------------|-------------------------|-------|------------|
 | 0 | 2026-10-24 | Project docs created | — | — | — | Start Phase 0 skeleton → Phase 1 |
 | 1 | 2026-10-24 | Design: retrieval context pack + planner + flow controller (docs only) | Company-style, flowing interviews → G9, G10 | — (not built yet) | — | Build in Phase 2–3, tests first |
+| 2 | 2026-10-24 | Exclude behavioral topics from the pool (smoke test showed a STAR question in a technical interview) | Pool matches MVP scope → G5 | behavioral question in first turn → 0 in 15 seeded pools (`test_pool_excludes_behavioral_topics`) | Yes | Extend category heuristics (leadership/aptitude topics) if they still feel off-scope |
+| 3 | 2026-10-24 | Topic step: 12 most-asked topics + search instead of all ~40 chips | One calm screen → G7 | ~40 chips (wall, Start below the fold at 390 px) → 12 chips + search, Start visible | Yes | Same pattern for the company step if its list grows |
+| 4 | 2026-10-24 | Tap targets ≥ 44 px, secondary actions in muted text | Minimalism checklist → G7 | chips ~42 px, Skip/Back in accent → all ≥ 44 px, secondary muted | Yes | Run the full checklist on the Mac with real audio |

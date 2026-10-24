@@ -75,7 +75,7 @@ export default function InterviewScreen({ api, sessionId, initial, total = 5, on
             <span key={i} className={`h-1.5 w-6 rounded-full ${i < asked ? "bg-accent" : "bg-hairline"}`} />
           ))}
         </div>
-        <button type="button" aria-label="More" onClick={() => setMenu((m) => !m)} className="px-2 text-2xl leading-none text-muted">•••</button>
+        <button type="button" aria-label="More" onClick={() => setMenu((m) => !m)} className="flex h-11 min-w-11 items-center justify-center text-2xl leading-none text-muted">•••</button>
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-10 text-center">

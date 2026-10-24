@@ -9,7 +9,7 @@ export default function SegmentedControl({ options, value, onChange }: Props) {
           type="button"
           aria-pressed={option === value}
           onClick={() => onChange(option)}
-          className={`rounded-[11px] px-4 py-2 text-[15px] transition ${option === value ? "bg-bg text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+          className={`min-h-[44px] rounded-[11px] px-4 py-2 text-[15px] transition ${option === value ? "bg-bg text-ink shadow-sm" : "text-muted hover:text-ink"}`}
         >
           {option}
         </button>
