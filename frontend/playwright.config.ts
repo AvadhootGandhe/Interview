@@ -12,6 +12,7 @@ const phone = { ...devices["iPhone 13"], viewport: { width: 390, height: 844 }, 
 export default defineConfig({
   testDir: "./e2e",
   testMatch: /.*\.spec\.ts/,
+  testIgnore: /voice\//, // needs Whisper/Kokoro: npm run e2e:voice
   timeout: 90_000,
   expect: { timeout: 15_000 },
   workers: 1,

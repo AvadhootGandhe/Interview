@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   api,
+  ApiError,
   audioSrc,
   DEFAULT_TOTAL,
   lineOf,
@@ -21,7 +22,13 @@ import { MicButton } from "./MicButton";
 import { MoreMenu } from "./MoreMenu";
 import { ProgressDots } from "./ProgressDots";
 
-type Problem = { kind: "mic" } | { kind: "send"; retry: () => void } | null;
+type Problem =
+  | { kind: "mic"; denied: boolean }
+  | { kind: "say"; text: string }
+  | { kind: "type"; text: string }
+  | { kind: "sound" }
+  | { kind: "send"; retry: () => void }
+  | null;
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -68,13 +75,29 @@ export function InterviewScreen({ id }: { id: string }) {
       audio.onerror = () => setSpeaking(false);
       setSpeaking(true);
       try {
-        Promise.resolve(audio.play()).catch(() => setSpeaking(false));
+        Promise.resolve(audio.play()).catch((err) => {
+          setSpeaking(false);
+          // Autoplay policy: the browser wants a tap before it lets us speak.
+          if (err?.name === "NotAllowedError") setProblem({ kind: "sound" });
+        });
       } catch {
         setSpeaking(false);
       }
     },
     [stopAudio],
   );
+
+  const playBlocked = useCallback(() => {
+    const audio = audioRef.current;
+    setProblem(null);
+    if (!audio) return;
+    setSpeaking(true);
+    try {
+      Promise.resolve(audio.play()).catch(() => setSpeaking(false));
+    } catch {
+      setSpeaking(false);
+    }
+  }, []);
 
   // Greeting handed over from the setup screen.
   useEffect(() => {
@@ -109,8 +132,11 @@ export function InterviewScreen({ id }: { id: string }) {
       setProblem(null);
       try {
         apply(await call(), typed);
-      } catch {
-        setProblem({ kind: "send", retry: () => void send(call, typed) });
+      } catch (err) {
+        const code = err instanceof ApiError ? err.code : undefined;
+        if (code === "no_speech") setProblem({ kind: "say", text: (err as ApiError).message });
+        else if (code === "speech_unavailable") setProblem({ kind: "type", text: (err as ApiError).message });
+        else setProblem({ kind: "send", retry: () => void send(call, typed) });
       } finally {
         setSending(false);
       }
@@ -124,7 +150,7 @@ export function InterviewScreen({ id }: { id: string }) {
     if (sending || done) return;
     stopAudio(); // let the candidate barge in
     setProblem(null);
-    recorder.start().catch(() => setProblem({ kind: "mic" }));
+    recorder.start().catch((err) => setProblem({ kind: "mic", denied: err?.name === "NotAllowedError" || err?.name === "SecurityError" }));
   }, [sending, done, stopAudio, recorder]);
 
   const release = recorder.stop;
@@ -210,9 +236,9 @@ export function InterviewScreen({ id }: { id: string }) {
           <MicButton recording={recorder.recording} disabled={sending} onPress={press} onRelease={release} />
         )}
         <div className="min-h-[52px]">
-          {problem?.kind === "mic" ? (
+          {problem?.kind === "mic" || problem?.kind === "type" ? (
             <StatusLine
-              text="Microphone unavailable."
+              text={problem.kind === "type" ? problem.text : problem.denied ? "Microphone access is off." : "Microphone unavailable."}
               action={{
                 label: "Type instead",
                 onClick: () => {
@@ -221,6 +247,10 @@ export function InterviewScreen({ id }: { id: string }) {
                 },
               }}
             />
+          ) : problem?.kind === "say" ? (
+            <StatusLine text={problem.text} />
+          ) : problem?.kind === "sound" ? (
+            <StatusLine text="Tap to hear your interviewer." action={{ label: "Play", onClick: playBlocked }} />
           ) : problem?.kind === "send" ? (
             <StatusLine text="Couldn’t send your answer." action={{ label: "Try again", onClick: problem.retry }} />
           ) : !done ? (

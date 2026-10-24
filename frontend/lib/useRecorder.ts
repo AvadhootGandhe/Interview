@@ -10,6 +10,14 @@ export interface Recorder {
   stop: () => void;
 }
 
+const MIME_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+
+/** First recording format this browser supports (Chrome/Firefox: webm/ogg, Safari: mp4); undefined = browser default. */
+export function pickMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") return undefined;
+  return MIME_TYPES.find((t) => MediaRecorder.isTypeSupported(t));
+}
+
 /**
  * Hold-to-talk recorder around MediaRecorder. Handles the race where the
  * user lets go before getUserMedia resolves: nothing is recorded or sent.
@@ -45,9 +53,22 @@ export function useRecorder(onComplete: (audio: Blob) => void): Recorder {
       return;
     }
     const chunks: Blob[] = [];
-    const rec = new MediaRecorder(stream);
+    let rec: MediaRecorder;
+    try {
+      const mimeType = pickMimeType();
+      rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    } catch (err) {
+      release();
+      holdingRef.current = false;
+      throw err;
+    }
     rec.ondataavailable = (e: BlobEvent | { data: Blob }) => {
       if (e.data && e.data.size > 0) chunks.push(e.data);
+    };
+    rec.onerror = () => {
+      release();
+      recorderRef.current = null;
+      setRecording(false);
     };
     rec.onstop = () => {
       release();
