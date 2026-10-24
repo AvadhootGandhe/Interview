@@ -6,7 +6,6 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   api,
   ApiError,
-  audioSrc,
   DEFAULT_TOTAL,
   lineOf,
   progressOf,
@@ -15,6 +14,7 @@ import {
   type SessionReply,
   type ThreadTurn,
 } from "@/lib/api";
+import { clipsOf, ClipPlayer } from "@/lib/clips";
 import { recallSession } from "@/lib/session";
 import { useRecorder } from "@/lib/useRecorder";
 import { Button, Orb, StatusLine, type OrbState } from "@/components/ui";
@@ -27,6 +27,7 @@ type Problem =
   | { kind: "say"; text: string }
   | { kind: "type"; text: string }
   | { kind: "sound" }
+  | { kind: "audio" }
   | { kind: "send"; retry: () => void }
   | null;
 
@@ -48,55 +49,25 @@ export function InterviewScreen({ id }: { id: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [focusAnswer, setFocusAnswer] = useState(false);
   const [problem, setProblem] = useState<Problem>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const player = useRef<ClipPlayer | null>(null);
+  if (!player.current) {
+    player.current = new ClipPlayer({
+      onSpeaking: setSpeaking,
+      onBlocked: () => setProblem({ kind: "sound" }),
+      onAllFailed: () => setProblem({ kind: "audio" }),
+    });
+  }
 
-  const stopAudio = useCallback(() => {
-    const a = audioRef.current;
-    if (a) {
-      a.onended = null;
-      try {
-        a.pause();
-      } catch {
-        /* jsdom */
-      }
-    }
-    audioRef.current = null;
-    setSpeaking(false);
+  const stopAudio = useCallback(() => player.current?.stop(), []);
+
+  const speak = useCallback((reply: SessionReply) => {
+    setProblem((p) => (p?.kind === "sound" || p?.kind === "audio" ? null : p));
+    player.current?.start(clipsOf(reply));
   }, []);
 
-  const speak = useCallback(
-    (url: string | null | undefined) => {
-      stopAudio();
-      const src = audioSrc(url);
-      if (!src || typeof Audio === "undefined") return;
-      const audio = new Audio(src);
-      audioRef.current = audio;
-      audio.onended = () => setSpeaking(false);
-      audio.onerror = () => setSpeaking(false);
-      setSpeaking(true);
-      try {
-        Promise.resolve(audio.play()).catch((err) => {
-          setSpeaking(false);
-          // Autoplay policy: the browser wants a tap before it lets us speak.
-          if (err?.name === "NotAllowedError") setProblem({ kind: "sound" });
-        });
-      } catch {
-        setSpeaking(false);
-      }
-    },
-    [stopAudio],
-  );
-
   const playBlocked = useCallback(() => {
-    const audio = audioRef.current;
     setProblem(null);
-    if (!audio) return;
-    setSpeaking(true);
-    try {
-      Promise.resolve(audio.play()).catch(() => setSpeaking(false));
-    } catch {
-      setSpeaking(false);
-    }
+    player.current?.resume();
   }, []);
 
   // Greeting handed over from the setup screen.
@@ -106,7 +77,7 @@ export function InterviewScreen({ id }: { id: string }) {
     setQuestion(lineOf(start));
     setTranscript(turnsOf(start));
     setProgress(progressOf(start));
-    speak(start.audio_url);
+    speak(start);
     return stopAudio;
   }, [id, speak, stopAudio]);
 
@@ -121,7 +92,7 @@ export function InterviewScreen({ id }: { id: string }) {
         setDone(true);
         setMenuOpen(false);
       }
-      speak(res.audio_url);
+      speak(res);
     },
     [speak],
   );
@@ -251,6 +222,8 @@ export function InterviewScreen({ id }: { id: string }) {
             <StatusLine text={problem.text} />
           ) : problem?.kind === "sound" ? (
             <StatusLine text="Tap to hear your interviewer." action={{ label: "Play", onClick: playBlocked }} />
+          ) : problem?.kind === "audio" ? (
+            <StatusLine text="Couldn’t play the audio. The question is above." />
           ) : problem?.kind === "send" ? (
             <StatusLine text="Couldn’t send your answer." action={{ label: "Try again", onClick: problem.retry }} />
           ) : !done ? (

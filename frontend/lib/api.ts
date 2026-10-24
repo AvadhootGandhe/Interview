@@ -41,7 +41,10 @@ export interface SessionReply {
   question_index: number;
   total_questions: number;
   messages: ReplyMessage[];
+  /** The whole reply as one clip. */
   audio_url?: string | null;
+  /** One clip per sentence, in speaking order (time to first audio). Empty/absent: use audio_url. */
+  audio_urls?: string[] | null;
   evaluation?: EvaluationSummary | null;
   /** What the candidate said, when the answer was spoken (speech-to-text). */
   transcript?: string | null;

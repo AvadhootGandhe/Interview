@@ -6,6 +6,14 @@ import { audioLog, hold, isSubsequence, orbLog, resetOrb, startInterview } from 
 test("hold to talk (pointer, then Space): audio reaches the backend, the interviewer replies aloud", async ({ page }) => {
   await startInterview(page);
 
+  // The greeting is greeting + first question (two or more sentences): each sentence is its own /audio/ clip,
+  // played one after the other, all finished by the time the orb is idle.
+  // (`next dev` runs effects twice, so the first clip can have been started and cancelled once: keep the last play per clip.)
+  const lastPlayOf = new Map((await audioLog(page)).filter((a) => a.src.includes("/audio/")).map((a) => [a.src, a]));
+  const greeting = [...lastPlayOf.values()];
+  expect(greeting.length, "greeting clips").toBeGreaterThan(1);
+  expect(greeting.every((a) => a.playing && a.ended && !a.error)).toBe(true);
+
   for (const how of ["pointer", "space"] as const) {
     const audioBefore = (await audioLog(page)).length;
     await resetOrb(page);
@@ -28,6 +36,10 @@ test("hold to talk (pointer, then Space): audio reaches the backend, the intervi
       .toBeTruthy();
     // ... and finishes; the orb returns to idle.
     await expect(page.getByTestId("orb")).toHaveAttribute("data-state", "idle", { timeout: 60_000 });
+    // Every sentence clip of the reply played, in the order the API listed them.
+    const want: string[] = body.audio_urls?.length ? body.audio_urls : body.audio_url ? [body.audio_url] : [];
+    const got = (await audioLog(page)).slice(audioBefore).filter((a) => a.src.includes("/audio/")).map((a) => new URL(a.src).pathname);
+    expect(got, `clips played (${how})`).toEqual(want);
     const orb = await orbLog(page);
     expect(isSubsequence(["listening", "thinking", "speaking", "idle"], orb), orb.join(">")).toBe(true);
     expect((await audioLog(page)).slice(audioBefore).some((a) => a.error)).toBe(false);
