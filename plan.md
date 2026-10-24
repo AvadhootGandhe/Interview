@@ -288,6 +288,19 @@ models/    🖥 git-ignored (GGUF)
 
 **Done when:** tests are green, every screen passes the minimalism checklist (`continuous_improvements.md`) in light and dark mode at 1440 px and 390 px, and G1 passes manually.
 
+**Status:**
+- [x] Scaffold `frontend/`: Next.js 15.5 (app router) + React 19 + TypeScript + Tailwind 3 + Framer Motion, exact versions pinned, npm scripts `dev` (:3000), `build`, `test` (`vitest run`), `lint`
+- [x] Design system: `styles/tokens.css`, `tailwind.config.ts` (3 text sizes: display/body/caption, 14–20px radii, hairlines, 44px tap targets, auto dark mode), `components/ui/` `Button`, `SegmentedControl`, `SearchField`, `Chip`, `Card`, `Orb` (+ `StatusLine` for one-line states). `MotionConfig reducedMotion="user"` plus a CSS reduced-motion guard
+- [x] `lib/api.ts`: every backend call, typed, base URL from `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`); small normalisers absorb shape drift (`greeting`/`text`, `["a"]`/`[{name}]`/`{items}`, numeric `progress`)
+- [x] `/` setup flow: Role chips → Level segmented → Company search (Skip) → Topic chips ("Any topic") → one blue **Start** pill; Back link; calm loading/error/empty lines
+- [x] `/interview/[id]`: orb (idle/speaking/listening/thinking), one-line question, hold-to-talk mic + Space, progress dots, "•••" sheet with transcript, typed answer and End; mic-denied → "Type instead"; send failure → one retry; `done` swaps the mic for "See your report"
+- [x] `/report/[id]`: score ring + verdict, per-question cards (tap for feedback), strengths, gaps, full conversation collapsed, "Practice again"
+- [x] Vitest + RTL tests written first (37 green): setup flow incl. Skip/Any topic, Start enabled/disabled, mic hold + Space with mocked MediaRecorder, "•••" menu, report from fixture, `lib/api`
+- [ ] Playwright E2E against the backend with `FAKE_LLM=1` (needs Phase 3 API and a browser)
+- [ ] Minimalism checklist screenshot review, light + dark, 1440 px + 390 px (no browser in the cloud session)
+- [ ] G1 manual voice run (needs Phases 3–4)
+- Notes: the greeting is handed from `/` to `/interview/[id]` via `sessionStorage` (per-tab convenience only); a reload shows a neutral prompt until the next answer. Topics are requested as `/catalog/topics?profile=…`; with more than 12 topics a filter field appears. Remaining `npm audit` items are build-time only (Next's vendored postcss, Tailwind 3's postcss-selector-parser) and need major upgrades.
+
 ---
 
 ## Phase 6: Polish
@@ -330,3 +343,4 @@ models/    🖥 git-ignored (GGUF)
 | 2026-10-24 | Orchestrator does its LLM work first, then saves a whole step in one commit; extra `session_states` table instead of new columns | No SQLite write lock held across API calls; existing ingested DBs need no migration |
 | 2026-10-24 | The interviewer checks that a reworded question keeps the seed's meaning with a cheap word-overlap rule and falls back to the seed text; the LLM judge is only used in evals | An extra judge call per turn would cost latency (G4) |
 | 2026-10-24 | The fallback plan uses at most two topic groups (the chosen or largest first) | Five questions from five topics scored 3+ abrupt jumps in the dry run |
+| 2026-10-24 | Frontend: Tailwind 3 (JS config) + Next 15.5.28 patched backport; all API calls in `lib/api.ts` with normalisers | `tailwind.config.ts` holds the design tokens; 15.5.28 fixes a critical Next advisory; backend shapes may still drift |

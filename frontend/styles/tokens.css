@@ -1,0 +1,37 @@
+/*
+ * Design tokens. Colours are RGB channels so Tailwind can apply alpha.
+ * Light: #ffffff / #f5f5f7 / #1d1d1f.  Dark: #000 / #1c1c1e / #f5f5f7.
+ * Secondary text #86868b. One accent, #0071e3, only for the primary
+ * action and active states.
+ */
+:root {
+  color-scheme: light dark;
+
+  --bg: 255 255 255;
+  --surface: 245 245 247;
+  --fg: 29 29 31;
+  --muted: 134 134 139;
+  --hairline: 0 0 0;
+  --accent: 0 113 227;
+  --on-accent: 255 255 255;
+
+  --hairline-alpha: 0.1;
+  --radius-sm: 14px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --tap: 44px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", system-ui,
+    sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: 0 0 0;
+    --surface: 28 28 30;
+    --fg: 245 245 247;
+    --muted: 134 134 139;
+    --hairline: 255 255 255;
+    --hairline-alpha: 0.14;
+  }
+}
