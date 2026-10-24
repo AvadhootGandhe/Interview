@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -38,7 +40,7 @@ async def _speak(request: Request, messages: list[str]) -> list[str]:
     tts = request.app.state.tts
     if tts is None:
         return []
-    urls = [await tts.synthesize(m) for m in messages]
+    urls = await asyncio.gather(*(tts.synthesize(m) for m in messages))
     return urls if all(urls) else []
 
 

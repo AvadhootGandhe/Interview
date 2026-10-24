@@ -125,3 +125,24 @@ def test_audio_route_without_stt_is_501(client):
     sid = client.post("/sessions", json=BODY).json()["session_id"]
     r = client.post(f"/sessions/{sid}/audio", files={"audio": ("a.webm", b"x", "audio/webm")})
     assert r.status_code == 501
+
+
+def test_messages_are_synthesized_concurrently(tmp_path):
+    import asyncio
+    import time
+
+    class SlowTTS:
+        async def synthesize(self, text):
+            await asyncio.sleep(0.3)
+            return "/audio/fake.wav"
+
+    eng = create_engine(f"sqlite:///{tmp_path / 'c.db'}", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng)
+    ingest(ROOT / "data" / "sample_questions.json", eng, ALIASES)
+    app = create_app(eng, llm=FakeInterviewLLM(), generator=NoGenerator(), followup_log=tmp_path / "f.jsonl",
+                     tts=SlowTTS(), audio_dir=tmp_path)
+    start = time.perf_counter()
+    data = TestClient(app).post("/sessions", json=BODY).json()
+    elapsed = time.perf_counter() - start
+    assert len(data["audio_urls"]) == 2
+    assert elapsed < 0.3 * 2  # two sequential 0.3 s syntheses would take >= 0.6 s plus the interview setup

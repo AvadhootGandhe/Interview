@@ -271,6 +271,8 @@ models/    🖥 git-ignored (GGUF)
 - Error states: mic denied, model server down, API errors. Each gets a calm one-line message with a single retry.
 - `scripts/bench_latency.py` 🖥 records p50 and p95.
 
+**Status:** [x] concurrent TTS of a turn's messages, `bench_latency.py` (p50/p95, tested percentile), calm one-line error states with a retry on every screen. Open: first-sentence streaming + pre-generated filler line (needs the Mac to tune), run `bench_latency.py` and the evals against real models.
+
 **Done when:** G1–G10 are all met. **That completes the MVP.**
 
 ---
