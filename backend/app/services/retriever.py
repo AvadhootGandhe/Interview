@@ -109,6 +109,7 @@ def build_pool(engine: Engine, filters: Filters, size: int = 40, seed: int | Non
             rng.shuffle(rows)
             if target is not None:
                 rows.sort(key=lambda r: abs(r["rank"] - target))
+            rows = list({r["id"]: r for r in reversed(rows)}.values())[::-1]  # one row per question, best level match
             by_topic: dict[str, list[dict]] = {}
             for r in rows:
                 by_topic.setdefault(r["topic"], []).append(r)
