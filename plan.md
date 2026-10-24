@@ -210,7 +210,7 @@ models/    🖥 git-ignored (GGUF)
 - `app/api/sessions.py`: `POST /sessions`, `POST /sessions/{id}/answer` (`text` for now), `POST /sessions/{id}/end`, `GET /sessions/{id}/report`.
 - `scripts/text_interview.py`: an interview in the terminal.
 
-**Status:** [x] planner, flow, evaluator, interviewer, orchestrator, reporter, Claude client, sessions API (text), `text_interview.py`, `FAKE_LLM=1` mode — all tested with fakes. Still open: `evals/answers.jsonl` + `evals/sessions.jsonl` + `scripts/run_evals.py` (needs API key); optional `transition` interviewer mode.
+**Status:** [x] planner, flow, evaluator, interviewer, orchestrator, reporter, Claude client, sessions API (text), `text_interview.py`, `FAKE_LLM=1` mode — all tested with fakes. `evals/answers.jsonl` (30), `evals/sessions.jsonl` (10) and `scripts/run_evals.py` (+ `--flow`) are written and unit-tested with fakes. **Still open: run them with a real `ANTHROPIC_API_KEY` to measure G3/G9/G10** (no key in this cloud session); optional `transition` interviewer mode.
 
 **Done when:** tests are green, G3 is at least 80% on the eval set, G9 passes on `evals/sessions.jsonl`, and in a terminal interview:
 - one deliberately weak answer triggers a relevant follow-up;

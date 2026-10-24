@@ -1,0 +1,10 @@
+{"id": "s01", "profile": "Backend", "level": "SDE-2/3", "company": "Amazon", "topic": null, "quality": ["strong", "weak", "strong", "mixed", "strong"]}
+{"id": "s02", "profile": "Backend", "level": "Fresher", "company": null, "topic": null, "quality": ["weak", "weak", "strong", "strong", "mixed"]}
+{"id": "s03", "profile": "DevOps", "level": "SDE-1/2", "company": "Google", "topic": null, "quality": ["strong", "strong", "strong", "strong", "strong"]}
+{"id": "s04", "profile": "AI Engineer", "level": "Architect/Principal", "company": "Amazon", "topic": "GenAI System Design", "quality": ["mixed", "mixed", "mixed", "mixed", "mixed"]}
+{"id": "s05", "profile": "Data Engineer", "level": "SDE-2/3", "company": null, "topic": null, "quality": ["weak", "strong", "strong", "weak", "strong"]}
+{"id": "s06", "profile": "ML Engineer", "level": "SDE-1", "company": "Stripe", "topic": null, "quality": ["strong", "weak", "strong", "mixed", "strong"]}
+{"id": "s07", "profile": "Database Developer", "level": "SDE-2/3", "company": "Amazon", "topic": null, "quality": ["weak", "weak", "strong", "strong", "mixed"]}
+{"id": "s08", "profile": "Fullstack", "level": "SDE-1/2", "company": "Google", "topic": null, "quality": ["strong", "strong", "strong", "strong", "strong"]}
+{"id": "s09", "profile": "AIOps", "level": "SDE-2/3", "company": null, "topic": null, "quality": ["mixed", "mixed", "mixed", "mixed", "mixed"]}
+{"id": "s10", "profile": "Backend", "level": "Architect/Principal", "company": "Stripe", "topic": null, "quality": ["weak", "strong", "strong", "weak", "strong"]}
