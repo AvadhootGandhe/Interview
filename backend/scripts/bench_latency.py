@@ -6,8 +6,8 @@
     ANTHROPIC_API_KEY=... SPEECH=real uvicorn app.main:app --port 8000
     python scripts/bench_latency.py --url http://127.0.0.1:8000 --turns 5 [--text]
 
-Each turn posts the answer (hello.wav through STT, or typed text with --text), then fetches the returned
-audio_url; the clock stops when the audio bytes arrive. Stage timings come from the Server-Timing header.
+Each turn posts the answer (hello.wav through STT, or typed text with --text), then fetches the first clip
+(audio_urls[0], else audio_url); the clock stops when the audio bytes arrive. Stage timings come from the Server-Timing header.
 G4 is only claimed when the server ran with a real ANTHROPIC_API_KEY (the script reports which it assumes).
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ def parse_server_timing(header: str) -> dict[str, float]:
     return out
 
 
-def run(url: str, turns: int, typed: bool, profile: str, level: str) -> dict:
+def run(url: str, turns: int, typed: bool, profile: str, level: str, pause: float = 0.0) -> dict:
     wall: list[float] = []
     stages: dict[str, list[float]] = {s: [] for s in STAGES}
     audio_missing = 0
@@ -62,8 +62,9 @@ def run(url: str, turns: int, typed: bool, profile: str, level: str) -> dict:
                 r = c.post(f"/sessions/{sid}/answer", files={"audio": ("hello.wav", audio, "audio/wav")})
             r.raise_for_status()
             data = r.json()
-            if data.get("audio_url"):
-                c.get(data["audio_url"]).raise_for_status()
+            first = (data.get("audio_urls") or [data.get("audio_url")])[0]  # audio starts with the first clip
+            if first:
+                c.get(first).raise_for_status()
             else:
                 audio_missing += 1
             wall.append((time.perf_counter() - t0) * 1000)
@@ -72,6 +73,7 @@ def run(url: str, turns: int, typed: bool, profile: str, level: str) -> dict:
                     stages[k].append(v)
             if data["done"]:
                 sid = None
+            time.sleep(pause)  # the candidate listens to the reply and thinks; background TTS finishes meanwhile
     return {"wall": wall, "stages": stages, "audio_missing": audio_missing}
 
 
@@ -97,10 +99,11 @@ def main() -> None:
     ap.add_argument("--url", default="http://127.0.0.1:8000")
     ap.add_argument("--turns", type=int, default=5)
     ap.add_argument("--text", action="store_true", help="send typed answers instead of hello.wav")
+    ap.add_argument("--pause", type=float, default=8.0, help="seconds between turns (listening + thinking); 0 = back to back")
     ap.add_argument("--profile", default="Backend")
     ap.add_argument("--level", default="SDE-2/3")
     a = ap.parse_args()
-    print(report(run(a.url, a.turns, a.text, a.profile, a.level), bool(os.environ.get("ANTHROPIC_API_KEY")), a.text))
+    print(report(run(a.url, a.turns, a.text, a.profile, a.level, a.pause), bool(os.environ.get("ANTHROPIC_API_KEY")), a.text))
 
 
 if __name__ == "__main__":

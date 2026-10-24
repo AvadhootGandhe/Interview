@@ -16,11 +16,13 @@ Response 200 (`SessionReply`, shared by `/answer` and `/end`):
   "state": "asking|done", "done": false, "question_index": 0, "total_questions": 5,
   "messages": [{"kind": "greeting", "text": "…"}, {"kind": "ask", "text": "…"}],
   "audio_url": "/audio/<hash>.wav",
+  "audio_urls": ["/audio/<s1>.wav", "/audio/<s2>.wav"],
   "transcript": null,
   "evaluation": null
 }
 ```
 - `audio_url` speaks the whole `text` (for start: greeting + first question as one clip). It is `null` if speech is off or TTS failed; always show `text` regardless. Fetch it from the same origin as the API (`GET /audio/{file}`, `audio/wav`).
+- `audio_urls` (time to first audio): one clip per sentence, in speaking order. Only `audio_urls[0]` is rendered when the response arrives; the rest render in the background (~0.3-0.5 s each). **To start speaking as early as possible, play `audio_urls[0]`, then the next ones in order.** Fetching a clip that is still rendering simply waits for it (up to 30 s), so you can request them all at once and queue them. `audio_url` is unchanged (the whole text as one clip) and also waits until the background render finishes; clients that ignore `audio_urls` keep working but start later. A one-sentence reply has `audio_urls == [audio_url]`; speech off or TTS failed gives `[]` and `null`.
 - For single-message replies `messages[0].audio_url` equals `audio_url`.
 - Errors: 422 bad filters / empty pool, 502 Claude unavailable.
 
@@ -48,7 +50,9 @@ No body. Closes early. Response: `SessionReply` with `kind: "closing"`, `done: t
 Only when `done`. Response: `{"overall_score", "strengths", "gaps", "verdict", "questions": [{"thread": [{"role", "text"}], …}], …}` (see `app/agents/reporter.py`). 409 if the interview is not finished.
 
 ## GET /audio/{file}
-Cached interviewer audio (`audio/wav`). 404 for unknown or unsafe names.
+Cached interviewer audio (`audio/wav`). A clip that is still rendering in the background is awaited (up to 30 s); 404 for unknown or unsafe names, or a clip whose rendering failed.
+
+On server start the speech models are warmed in a background task (`/health` answers at once). `TTS_CACHE=0` disables the audio cache (for honest benchmarks only).
 
 ## Catalog and health
 `GET /health` returns `{"status": "ok"}`. Catalog routes (profiles, levels, companies, topics) live in `app/api/catalog.py`.

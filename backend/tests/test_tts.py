@@ -65,6 +65,14 @@ async def test_long_text_is_sent_sentence_by_sentence_and_joined(tmp_path):
         assert w.getnframes() == 3 * 2400
 
 
+async def test_cache_can_be_disabled_for_honest_benchmarks(tmp_path):
+    engine = FakeEngine()
+    svc = tts.TextToSpeech(engine, cache_dir=tmp_path, use_cache=False)
+    await svc.synthesize("Same text.")
+    await svc.synthesize("Same text.")
+    assert engine.calls == ["Same text.", "Same text."]
+
+
 async def test_cache_by_text_hash(tmp_path):
     engine = FakeEngine()
     svc = tts.TextToSpeech(engine, cache_dir=tmp_path)

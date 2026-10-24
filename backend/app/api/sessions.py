@@ -63,7 +63,8 @@ class SessionReply(BaseModel):
     question_index: int
     total_questions: int
     messages: list[dict]
-    audio_url: str | None = None  # spoken version of `text`; null if speech is off or TTS failed
+    audio_url: str | None = None  # whole `text` as one clip; null if speech is off or TTS failed
+    audio_urls: list[str] = []  # per-sentence clips in order; urls[0] is ready now, later ones may still be rendering
     transcript: str | None = None  # what the candidate said (STT) or typed; set on /answer
     evaluation: EvaluationSummary | None = None
 
@@ -84,7 +85,13 @@ async def _speak(out: SessionReply, tts, timings: dict[str, float]) -> None:
         return
     t0 = time.perf_counter()
     try:
-        out.audio_url = await tts.synthesize(out.text)
+        stream = getattr(tts, "synthesize_stream", None)
+        if stream is not None:
+            clips = await stream(out.text)
+            out.audio_url, out.audio_urls = clips.full_url, clips.urls
+        else:
+            out.audio_url = await tts.synthesize(out.text)
+            out.audio_urls = [out.audio_url]
         if len(out.messages) == 1:
             out.messages[0]["audio_url"] = out.audio_url
     except Exception:  # noqa: BLE001

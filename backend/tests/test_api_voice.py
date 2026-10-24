@@ -21,6 +21,16 @@ class BrokenTTS:
         raise RuntimeError("engine crashed")
 
 
+class StreamTTS:
+    """Has the streaming interface: first clip now, whole-text clip for backward compatibility."""
+
+    async def synthesize_stream(self, text: str):
+        from app.speech.tts import Clips
+
+        n = len(text.split(". "))
+        return Clips(urls=[f"/audio/c{i}.wav" for i in range(n)], full_url="/audio/full.wav")
+
+
 @pytest.fixture
 def env(db_url, tmp_path, monkeypatch):
     engine = make_engine(db_url)
@@ -152,3 +162,21 @@ class TestEngineSelection:
         assert await FakeSpeechToText().transcribe(b"abc")
         url = await FakeSpeechTTS(cache_dir=tmp_path).synthesize("hello there")
         assert (tmp_path / url.removeprefix("/audio/")).is_file()
+
+
+def test_audio_urls_lists_per_sentence_clips_and_audio_url_stays_the_whole_text(env):
+    app.dependency_overrides[speech_deps.get_tts] = lambda: StreamTTS()
+    data = env.client.post("/sessions", json=BODY).json()
+    assert len(data["audio_urls"]) >= 2
+    assert data["audio_url"] == "/audio/full.wav"
+    assert data["messages"][-1].get("audio_url") in (None, "/audio/full.wav")
+
+
+def test_audio_urls_falls_back_to_single_clip_for_plain_tts(env):
+    data = env.client.post("/sessions", json=BODY).json()
+    assert data["audio_urls"] == [data["audio_url"]]
+
+
+def test_no_speech_means_empty_audio_urls(env):
+    app.dependency_overrides[speech_deps.get_tts] = lambda: None
+    assert env.client.post("/sessions", json=BODY).json()["audio_urls"] == []

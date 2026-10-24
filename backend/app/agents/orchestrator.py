@@ -10,6 +10,7 @@ without holding a write transaction, then saves everything in one commit.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
@@ -233,8 +234,11 @@ class Orchestrator:
         seed = next(p for p in state.items() if p.id == plan.segments[0].seed_question_id)
 
         base = self._closing_input(session, state)
-        greeting = await self._say(InterviewerInput(**{**base.__dict__, "mode": "greeting"}))
-        question = await self._say(self._ask_input(session, state, "ask", seed, None, ""))
+        # Independent of each other: run both Claude calls at once (saves one LLM round trip at start).
+        greeting, question = await asyncio.gather(
+            self._say(InterviewerInput(**{**base.__dict__, "mode": "greeting"})),
+            self._say(self._ask_input(session, state, "ask", seed, None, "")),
+        )
 
         self.db.add(session)
         self.db.flush()

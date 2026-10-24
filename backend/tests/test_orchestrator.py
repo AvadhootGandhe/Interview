@@ -181,3 +181,26 @@ async def test_unknown_session(db, tmp_path):
     o = orch(db, RoutedLLM(), tmp_path)
     with pytest.raises(KeyError):
         await o.answer("nope", "hi")
+
+
+async def test_start_writes_greeting_and_first_question_concurrently(db, tmp_path):
+    """Latency: the two interviewer calls at start do not depend on each other, so they overlap."""
+    import asyncio
+
+    state = {"now": 0, "peak": 0}
+    inner = llm_with(80)
+
+    class Slow:
+        async def complete(self, prompt, **kw):
+            if kw.get("task") != "interview":
+                return await inner.complete(prompt, **kw)
+            state["now"] += 1
+            state["peak"] = max(state["peak"], state["now"])
+            await asyncio.sleep(0.05)
+            state["now"] -= 1
+            return await inner.complete(prompt, **kw)
+
+    o = orch(db, Slow(), tmp_path, pack_builder=fixed_pack(db))
+    first = await o.start(FILTERS)
+    assert state["peak"] == 2
+    assert [m["kind"] for m in first.messages] == ["greeting", "ask"]

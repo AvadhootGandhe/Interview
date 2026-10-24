@@ -264,6 +264,7 @@ models/    🖥 git-ignored (GGUF)
 - [x] 🖥 End to end without a browser: `tests/test_voice_live.py` (marked local) posts `hello.wav` through real STT, DemoLLM and real TTS; transcript contains 'hello' and the audio is served from `/audio/`. Passes.
 - [x] 🖥 `scripts/bench_latency.py` written. Measured with FAKE LLM + real STT/TTS (6 audio turns): end of answer to audio ready p50 2.85 s, p95 4.16 s; STT p50 0.27 s, TTS p50 2.45 s. **G4 not claimed**: needs a run with a real `ANTHROPIC_API_KEY`.
 - [ ] 🖥 Real-browser webm E2E (frontend) and the G4 bench with real Claude.
+- [x] Latency pass 1 (see `continuous_improvements.md` rows 10-13): speech warm-up at start, per-sentence `audio_urls`, concurrent greeting + first question. Remaining for G4: bench with real Claude, frontend plays `audio_urls` in sequence, stream Claude tokens into TTS.
 
 ---
 

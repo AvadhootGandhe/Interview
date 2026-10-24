@@ -81,11 +81,34 @@ class MlxWhisperEngine:
         )
         return result.get("text", "")
 
+    def warm_up(self) -> None:
+        """Load the model by transcribing one second of faint noise (bypasses the silence gate)."""
+        import random
+
+        rnd = random.Random(0)
+        samples = [rnd.randint(-300, 300) for _ in range(16000)]
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(16000)
+            w.writeframes(array("h", samples).tobytes())
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "warm.wav")
+            with open(path, "wb") as f:
+                f.write(buf.getvalue())
+            self.transcribe_file(path)
+
 
 class SpeechToText:
     def __init__(self, engine: STTEngine | None = None, convert: Callable[[bytes], bytes] | None = None) -> None:
         self.engine = engine or MlxWhisperEngine()
         self.convert = convert or convert_to_wav16k
+
+    def warm_up(self) -> None:
+        warm = getattr(self.engine, "warm_up", None)
+        if warm is not None:
+            warm()
 
     async def transcribe(self, audio: bytes | None) -> str:
         if not audio:
