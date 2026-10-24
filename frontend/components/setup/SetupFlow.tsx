@@ -19,7 +19,7 @@ const TITLES: Record<Step, string> = {
 };
 
 const MAX_COMPANY_RESULTS = 8;
-const MAX_TOPIC_CHIPS = 12;
+const MAX_TOPIC_CHIPS = 8;
 const SEARCH_DEBOUNCE_MS = 200;
 
 export function SetupFlow() {

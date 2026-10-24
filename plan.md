@@ -296,8 +296,8 @@ models/    🖥 git-ignored (GGUF)
 - [x] `/interview/[id]`: orb (idle/speaking/listening/thinking), one-line question, hold-to-talk mic + Space, progress dots, "•••" sheet with transcript, typed answer and End; mic-denied → "Type instead"; send failure → one retry; `done` swaps the mic for "See your report"
 - [x] `/report/[id]`: score ring + verdict, per-question cards (tap for feedback), strengths, gaps, full conversation collapsed, "Practice again"
 - [x] Vitest + RTL tests written first (37 green): setup flow incl. Skip/Any topic, Start enabled/disabled, mic hold + Space with mocked MediaRecorder, "•••" menu, report from fixture, `lib/api`
-- [ ] Playwright E2E against the backend with `FAKE_LLM=1` (needs Phase 3 API and a browser)
-- [ ] Minimalism checklist screenshot review, light + dark, 1440 px + 390 px (no browser in the cloud session)
+- [x] Playwright E2E (`npm run e2e`, 4 projects: light/dark x 1440/390) against the real backend with `FAKE_LLM=1` on a temp SQLite DB ingested from the sample data; frontend aligned to the real API shapes
+- [x] Minimalism checklist screenshot review, light + dark, 1440 px + 390 px (e2e/screenshots, git-ignored); fixes: report card double padding, overlapping placeholder line, dev badge, fewer topic chips
 - [ ] G1 manual voice run (needs Phases 3–4)
 - Notes: the greeting is handed from `/` to `/interview/[id]` via `sessionStorage` (per-tab convenience only); a reload shows a neutral prompt until the next answer. Topics are requested as `/catalog/topics?profile=…`; with more than 12 topics a filter field appears. Remaining `npm audit` items are build-time only (Next's vendored postcss, Tailwind 3's postcss-selector-parser) and need major upgrades.
 

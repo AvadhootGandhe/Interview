@@ -195,9 +195,10 @@ export function InterviewScreen({ id }: { id: string }) {
             exit={reduce ? undefined : { opacity: 0 }}
             transition={{ duration: 0.35 }}
             aria-live="polite"
+            data-testid="question"
             className="min-h-[3em] max-w-[30rem] text-center text-body text-fg"
           >
-            {question || (done ? "" : "Hold the button and start talking.")}
+            {question}
           </motion.p>
         </AnimatePresence>
       </section>

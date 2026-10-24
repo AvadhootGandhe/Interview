@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { api, type Report, type ReportQuestion } from "@/lib/api";
 import { useLoad } from "@/lib/useLoad";
-import { Card, StatusLine, buttonClasses, cx, spring } from "@/components/ui";
+import { StatusLine, buttonClasses, cx, spring } from "@/components/ui";
 
 export function verdictFor(score: number): string {
   if (score >= 85) return "Excellent interview.";
@@ -51,7 +51,7 @@ function QuestionCard({ q }: { q: ReportQuestion }) {
   const panel = useId();
   const n = q.follow_ups;
   return (
-    <Card className="p-0">
+    <div className="rounded-lg bg-surface">
       <button
         type="button"
         aria-expanded={open}
@@ -76,7 +76,7 @@ function QuestionCard({ q }: { q: ReportQuestion }) {
           )}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
