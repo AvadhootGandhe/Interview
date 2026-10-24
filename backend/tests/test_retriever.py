@@ -109,3 +109,13 @@ def test_fts_kafka_finds_streaming_questions(engine):
 @pytest.mark.parametrize("q", ["", "   ", "the a of", "!!! ???", 'a" OR "'])
 def test_fts_empty_or_stopword_input_returns_empty(engine, q):
     assert search(engine, q, _all_pool(engine)) == []
+
+
+@pytest.mark.parametrize("f", [
+    Filters(profile="Backend", level="SDE-2/3", company="Amazon"),
+    Filters(profile="Backend"),
+    Filters(profile="Fullstack", company="Google"),
+])
+def test_pool_excludes_behavioral_topics(engine, f):
+    for seed in range(5):
+        assert not any(p.topic.startswith("Behavioral") for p in build_pool(engine, f, seed=seed))

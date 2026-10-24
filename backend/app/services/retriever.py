@@ -57,7 +57,7 @@ def _stages(f: Filters) -> list[tuple[str | None, bool, bool, bool]]:
 
 
 def _candidates(conn, f: Filters, company, use_level, use_topic, exclude, salt) -> list[dict]:
-    where = ["p.name = :profile"]
+    where = ["p.name = :profile", "t.category != 'behavioral'"]  # behavioral is a later track
     params: dict = {"profile": f.profile, "limit": CANDIDATE_LIMIT, "salt": salt}
     if company:
         where.append("c.name = :company")
