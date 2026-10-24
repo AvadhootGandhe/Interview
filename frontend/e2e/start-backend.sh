@@ -16,6 +16,8 @@ PY="${E2E_PYTHON:-$BACKEND/.venv/bin/python}"
 cd "$BACKEND"
 export DATABASE_URL="sqlite:///$TMP/e2e.db"
 export FAKE_LLM=1
+# E2E_SPEECH=real runs the real Whisper/Kokoro stack (npm run e2e:voice); unset keeps the default.
+[ -z "${E2E_SPEECH:-}" ] || export SPEECH="$E2E_SPEECH"
 export FOLLOWUP_LOG_PATH="$TMP/followups.jsonl"
 export CORS_ORIGINS="[\"$WEB_ORIGIN\"]"
 

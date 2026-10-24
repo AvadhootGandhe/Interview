@@ -75,6 +75,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -88,13 +89,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   if (!res.ok) {
     let detail = res.statusText;
+    let code: string | undefined;
     try {
       const body = await res.json();
       detail = typeof body?.detail === "string" ? body.detail : detail;
+      code = typeof body?.code === "string" ? body.code : undefined;
     } catch {
       /* non-JSON error body */
     }
-    throw new ApiError(res.status, detail || `HTTP ${res.status}`);
+    throw new ApiError(res.status, detail || `HTTP ${res.status}`, code);
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();

@@ -263,7 +263,8 @@ models/    🖥 git-ignored (GGUF)
 - [x] The answer endpoint accepts multipart audio or JSON text; every interviewer reply carries `audio_url` (null if TTS fails or speech is off); silent audio gives a calm 422 `no_speech` and does not advance; STT/TTS injected via `app/speech/deps.py` (`SPEECH=auto|real|fake|off`); `Server-Timing` per stage; `backend/API.md` documents the shapes. Tests first in `tests/test_api_voice.py` (12 tests). Cloud suite: 261 green.
 - [x] 🖥 End to end without a browser: `tests/test_voice_live.py` (marked local) posts `hello.wav` through real STT, DemoLLM and real TTS; transcript contains 'hello' and the audio is served from `/audio/`. Passes.
 - [x] 🖥 `scripts/bench_latency.py` written. Measured with FAKE LLM + real STT/TTS (6 audio turns): end of answer to audio ready p50 2.85 s, p95 4.16 s; STT p50 0.27 s, TTS p50 2.45 s. **G4 not claimed**: needs a run with a real `ANTHROPIC_API_KEY`.
-- [ ] 🖥 Real-browser webm E2E (frontend) and the G4 bench with real Claude.
+- [x] 🖥 Real-browser voice E2E: `npm run e2e:voice` (Chromium fake mic playing `frontend/e2e/fixtures/answer.wav`, real Whisper + Kokoro, FAKE_LLM): hold-to-talk by pointer and by Space, multipart audio, transcript, spoken reply, orb idle > listening > thinking > speaking > idle, silent clip gives the calm 'didn't catch that'. Passes (2 tests).
+- [ ] 🖥 The G4 bench with real Claude.
 
 ---
 
@@ -300,7 +301,8 @@ models/    🖥 git-ignored (GGUF)
 - [x] Vitest + RTL tests written first (37 green): setup flow incl. Skip/Any topic, Start enabled/disabled, mic hold + Space with mocked MediaRecorder, "•••" menu, report from fixture, `lib/api`
 - [x] Playwright E2E (`npm run e2e`, 4 projects: light/dark x 1440/390) against the real backend with `FAKE_LLM=1` on a temp SQLite DB ingested from the sample data; frontend aligned to the real API shapes
 - [x] Minimalism checklist screenshot review, light + dark, 1440 px + 390 px (e2e/screenshots, git-ignored); fixes: report card double padding, overlapping placeholder line, dev badge, fewer topic chips
-- [ ] G1 manual voice run (needs Phases 3–4)
+- [x] G1 voice path proven in a real browser with a fake mic (`npm run e2e:voice`; kept out of `npm run e2e`). Frontend fixes (Vitest first, 46 green): MediaRecorder mime fallback (webm/opus, webm, mp4 for Safari), tracks released if the recorder cannot start, blocked autoplay shows one 'Play' action, mic denied says 'Microphone access is off.' with 'Type instead', server `no_speech`/`speech_unavailable` shown as their own calm line (no retry button).
+- [ ] G1 manual voice run with a real microphone and real Claude (human check)
 - Notes: the greeting is handed from `/` to `/interview/[id]` via `sessionStorage` (per-tab convenience only); a reload shows a neutral prompt until the next answer. Topics are requested as `/catalog/topics?profile=…`; with more than 12 topics a filter field appears. Remaining `npm audit` items are build-time only (Next's vendored postcss, Tailwind 3's postcss-selector-parser) and need major upgrades.
 
 ---

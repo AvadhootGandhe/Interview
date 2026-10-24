@@ -8,7 +8,8 @@
     "start": "next start -p 3000",
     "test": "vitest run",
     "lint": "next lint",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:voice": "playwright test -c playwright.voice.config.ts"
   },
   "dependencies": {
     "framer-motion": "12.43.0",
