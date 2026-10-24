@@ -111,6 +111,8 @@ models/    🖥 git-ignored (GGUF)
 - `scripts/check_model.py`: prints 3 questions.
 - ⚠ Training used `by_profile_level_topic.json`, which is not in the repo. Confirm its profile, level and topic names match the company file.
 
+**Status:** [x] unit tests + `local_client.py`, `question_generator.py`, `check_model.py`, live test written (cloud). 🖥 GGUF export and live run still to do on the Mac.
+
 **Done when:** the unit tests are green. 🖥 `check_model.py` prints sensible single questions in under 2 s each.
 
 ---
