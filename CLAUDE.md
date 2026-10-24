@@ -17,7 +17,7 @@ Read these first, in order:
 ## Commands (once scaffolded)
 ```bash
 cd backend && pytest -m "not local" -q            # cloud-safe tests
-cd backend && uvicorn app.main:app --reload        # API on :8000
+cd backend && uvicorn app.main:app_factory --factory --reload   # API on :8000 (FAKE_LLM=1 for no keys)
 cd frontend && npm run dev                         # UI on :3000
 llama-server -m models/interviewer-q4_k_m.gguf --port 8081 -c 2048 -ngl 99   # local only
 ```
