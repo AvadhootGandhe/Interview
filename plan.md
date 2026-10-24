@@ -117,7 +117,7 @@ models/    🖥 git-ignored (GGUF)
 **Status:**
 - [x] Unit tests written first, then `app/config.py`, `app/llm/local_client.py`, `app/agents/question_generator.py` (13 tests green). Prompt checked against the notebook and a byte-exact fixture.
 - [x] `scripts/check_model.py` (run with `python -m scripts.check_model` from `backend/`)
-- [ ] 🖥 Export GGUF in Colab, run `llama-server`, run `pytest -m local` and `check_model.py` (< 2 s per question)
+- [x] 🖥 Serve the model on the Mac (2026-10-24): no Colab export. Base `Qwen3-4B-Q4_K_M.gguf` (from `Qwen/Qwen3-4B-GGUF`) plus the LoRA converted with llama.cpp `convert_lora_to_gguf.py --base-model-id Qwen/Qwen3-4B --outtype f16` → `models/interviewer-lora-f16.gguf`. Run: `llama-server -m models/Qwen3-4B-Q4_K_M.gguf --lora models/interviewer-lora-f16.gguf --port 8081 -c 2048 -ngl 99`. `pytest -m local` live test passes; `check_model.py` gives single on-topic questions in ~1.6–2.0 s each. Note: the LoRA was trained on the bnb-4bit base; it runs here on the standard Qwen3-4B Q4_K_M base, which looks fine in spot checks but is not a merged GGUF.
 - [ ] 🖥 Confirm `by_profile_level_topic.json` profile/level/topic names match the company file
 
 ---
@@ -165,7 +165,7 @@ models/    🖥 git-ignored (GGUF)
 - [x] Ingest: ijson streams one company at a time, `--source`/`--db`/`--batch-size`, `INSERT OR IGNORE` (idempotent), FTS5 with the porter tokenizer. Aliases live in `app/db/company_aliases.json`; the topic category list in `app/db/names.py`.
 - [x] Retriever: widening `exact → drop_company → general → drop_level → drop_topic → profile_only`; never empty; recent-session exclusion; ≤ 40% per topic; behavioral topics only when asked for.
 - [x] Company profile (topic mix by SQL, summary via an injected LLM client, cached in `company_profiles`) and context pack (≤ 3K tokens, generator fallback).
-- [ ] 🖥 Run the full ingest and `pytest -m local tests/test_ingest_full_live.py` (< 15 min, ~131K questions, ~3.86M mappings, FTS "idempotency" < 50 ms).
+- [x] 🖥 Full ingest and `pytest -m local tests/test_ingest_full_live.py` (2026-10-24): 34 s, 130,998 questions, 3,855,261 mappings, 3,815 companies, 402 topics; FTS "idempotency" ≈ 1 ms; both live tests pass. Run: `python -m scripts.ingest --source ../by_company_profile_level_topic.json --db sqlite:///./data_full.db` (the db is git-ignored).
 - [ ] Wire the company-profile summary to `claude_client` (Claude Haiku) once it exists in Phase 3; tests use the FakeLLM.
 
 ---
