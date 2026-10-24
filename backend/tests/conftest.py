@@ -102,3 +102,22 @@ def db(db_url):
     with Session(engine) as session:
         yield session
     engine.dispose()
+
+
+# --- Phase 3: shared fixtures for agents, flow and orchestrator -----------------
+
+@pytest.fixture
+def pool() -> list:
+    from helpers import make_pool
+
+    return make_pool()
+
+
+@pytest.fixture
+def train_log(tmp_path, monkeypatch):
+    """Redirect data/followup_train.jsonl so tests never touch the real file."""
+    from app.config import settings
+
+    path = tmp_path / "followup_train.jsonl"
+    monkeypatch.setattr(settings, "followup_train_path", str(path))
+    return path

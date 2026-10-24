@@ -226,6 +226,16 @@ models/    🖥 git-ignored (GGUF)
 - mentioning a technology (for example, Redis) leads to a bridged next question;
 - the questions clearly build from warm-up to stretch.
 
+**Status:**
+- [x] Tests first: planner, flow, evaluator, interviewer, orchestrator, reporter, claude client, sessions API, eval files and scripts (224 cloud-safe tests green, fake LLM)
+- [x] `agents/base.py`, `llm/claude_client.py` (+ `fake_llm.py`, `factory.py`), `planner.py` + fallback plan, `services/flow.py`, `evaluator.py`, `interviewer.py`, `reporter.py`, `orchestrator.py`, `api/sessions.py`, prompts
+- [x] Company-profile summary routed to Haiku through `claude_client` (`task="company_profile"`)
+- [x] `scripts/text_interview.py` (`--fake` runs offline), `scripts/run_evals.py` (G3, `--flow` G9/G10), `evals/answers.jsonl` (32), `evals/sessions.jsonl` (10)
+- [ ] Live: G3 >= 80% on `evals/answers.jsonl` (needs ANTHROPIC_API_KEY)
+- [ ] Live: G9/G10 on `evals/sessions.jsonl` via `run_evals.py --flow` (needs ANTHROPIC_API_KEY)
+- [ ] Live: terminal interview check (weak answer -> follow-up, Redis -> bridge, warm-up to stretch) with real Claude
+- Notes: the reporter prompt is `prompts/feedback.md` (not `reporter.md`); a pulled-forward question swaps places with the segment it came from so no question repeats; mention bridges take priority over harder/easier.
+
 ---
 
 ## Phase 4: Speech 🖥

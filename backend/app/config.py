@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     satisfaction_threshold: int = 70
     max_followups: int = 2
     followup_penalty: int = 5
+    flow_harder_at: int = 85  # final score >= this -> harder next question
+    flow_easier_at: int = 50  # final score <= this -> easier next question
 
     # Retrieval (Phase 2)
     level_difficulty: dict[str, int] = {
@@ -42,6 +44,19 @@ class Settings(BaseSettings):
     profile_summary_max_tokens: int = 300
     max_context_tokens: int = 3000  # estimated as chars / 4
     generated_per_pack: int = 3
+
+    # Claude (Phase 3). Model ids come from here, never from agent code.
+    claude_model: str = "claude-sonnet-5-5"  # evaluator, planner, interviewer, reporter
+    claude_model_cheap: str = "claude-haiku-5-5"  # company-profile summary
+    claude_effort: str = "medium"  # low|medium|high: thinking depth vs latency
+    claude_max_tokens: int = 2048
+    claude_timeout_s: float = 60.0
+
+    # Interview loop (Phase 3)
+    max_interview_minutes: int = 45  # 0 disables the time limit
+    examples_per_ask: int = 3  # similar retrieved questions shown to the interviewer as style examples
+    max_spoken_words: int = 60
+    followup_train_path: str = ""  # default: <repo>/data/followup_train.jsonl
 
 
 settings = Settings()
