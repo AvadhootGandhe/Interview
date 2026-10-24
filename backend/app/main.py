@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import catalog, sessions
+from app.api import audio, catalog, sessions
 from app.config import settings
 
 app = FastAPI(title="AI Mock Interview")
@@ -13,6 +13,7 @@ app.add_middleware(
 )
 app.include_router(catalog.router)
 app.include_router(sessions.router)
+app.include_router(audio.router)
 
 
 @app.get("/health")

@@ -1,0 +1,4 @@
+mlx-whisper
+kokoro>=0.9
+soundfile
+numpy

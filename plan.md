@@ -117,7 +117,7 @@ models/    🖥 git-ignored (GGUF)
 **Status:**
 - [x] Unit tests written first, then `app/config.py`, `app/llm/local_client.py`, `app/agents/question_generator.py` (13 tests green). Prompt checked against the notebook and a byte-exact fixture.
 - [x] `scripts/check_model.py` (run with `python -m scripts.check_model` from `backend/`)
-- [ ] 🖥 Export GGUF in Colab, run `llama-server`, run `pytest -m local` and `check_model.py` (< 2 s per question)
+- [x] 🖥 Serve the model on the Mac (2026-10-24): no Colab export. Base `Qwen3-4B-Q4_K_M.gguf` (from `Qwen/Qwen3-4B-GGUF`) plus the LoRA converted with llama.cpp `convert_lora_to_gguf.py --base-model-id Qwen/Qwen3-4B --outtype f16` → `models/interviewer-lora-f16.gguf`. Run: `llama-server -m models/Qwen3-4B-Q4_K_M.gguf --lora models/interviewer-lora-f16.gguf --port 8081 -c 2048 -ngl 99`. `pytest -m local` live test passes; `check_model.py` gives single on-topic questions in ~1.6–2.0 s each. Note: the LoRA was trained on the bnb-4bit base; it runs here on the standard Qwen3-4B Q4_K_M base, which looks fine in spot checks but is not a merged GGUF.
 - [ ] 🖥 Confirm `by_profile_level_topic.json` profile/level/topic names match the company file
 
 ---
@@ -167,6 +167,8 @@ models/    🖥 git-ignored (GGUF)
 - [x] Company profile (topic mix by SQL, summary via an injected LLM client, cached in `company_profiles`) and context pack (≤ 3K tokens, generator fallback).
 - [ ] 🖥 Run the full ingest and `pytest -m local tests/test_ingest_full_live.py` (< 15 min, ~131K questions, ~3.86M mappings, FTS "idempotency" < 50 ms).
 - [x] Company-profile summary wired to `claude_client` (Phase 3): it calls `complete(task="company_profile", model=settings.cheap_model)` (Haiku); tests use the fakes.
+- [x] 🖥 Full ingest and `pytest -m local tests/test_ingest_full_live.py` (2026-10-24): 34 s, 130,998 questions, 3,855,261 mappings, 3,815 companies, 402 topics; FTS "idempotency" ≈ 1 ms; both live tests pass. Run: `python -m scripts.ingest --source ../by_company_profile_level_topic.json --db sqlite:///./data_full.db` (the db is git-ignored).
+- [ ] Wire the company-profile summary to `claude_client` (Claude Haiku) once it exists in Phase 3; tests use the FakeLLM.
 
 ---
 
@@ -254,6 +256,12 @@ models/    🖥 git-ignored (GGUF)
 **Implement:** `app/speech/stt.py` (mlx-whisper `base.en`), `app/speech/tts.py` (Kokoro, one voice, cached), and audio served at `/audio/{file}`.
 
 **Done when:** tests are green. 🖥 A recorded answer goes in and spoken interviewer audio comes out.
+
+**Status:**
+- [x] `tests/test_stt.py`, `tests/test_tts.py`, `tests/test_api_audio.py` written first (26 tests), then `app/speech/stt.py`, `app/speech/tts.py`, `app/api/audio.py` (registered in `app/main.py`). Cloud suite: 145 green.
+- [x] 🖥 Live: `tests/test_speech_live.py` (marked local). mlx-whisper `whisper-base.en-mlx` on `tests/fixtures/hello.wav` (made with `say` + ffmpeg, 139 KB): WER 0.0 (limit 15%). Kokoro-82M voice `af_heart`: 0.44 s for one sentence after warm-up (limit 1 s). Mac-only deps in `backend/requirements-local.txt`.
+- [ ] `tests/test_api_sessions.py`: the answer endpoint accepts multipart audio (owned by the Phase 3 sessions API; wire `SpeechToText` and `TextToSpeech` into it, same interface as `FakeSTT`/`FakeTTS`).
+- [ ] 🖥 End to end: a recorded browser answer (webm) in, spoken interviewer audio out (needs the sessions API and frontend; ffmpeg conversion of webm is only unit-tested with a fake).
 
 ---
 
