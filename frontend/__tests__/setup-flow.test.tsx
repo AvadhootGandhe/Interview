@@ -8,7 +8,7 @@ const api: CatalogApi = {
   profiles: async () => ["Backend", "DevOps"],
   levels: async () => ["Fresher", "SDE-1", "SDE-2/3"],
   companies: vi.fn(async (q: string) => (q.toLowerCase().startsWith("am") ? ["Amazon"] : [])),
-  topics: async () => ["Kafka", "Caching"],
+  topics: vi.fn(async (_p: string, _c?: string, q?: string) => (q ? ["Redis"] : ["Kafka", "Caching"])),
 };
 
 describe("canStart", () => {
@@ -51,6 +51,19 @@ describe("SetupFlow", () => {
     await user.click(await screen.findByRole("button", { name: "Caching" }));
     await user.click(screen.getByRole("button", { name: /start/i }));
     expect(onStart).toHaveBeenCalledWith({ profile: "DevOps", level: "SDE-1", company: "Amazon", topic: "Caching" });
+  });
+
+  it("searches topics beyond the short list", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    render(<SetupFlow api={api} onStart={onStart} />);
+    await user.click(await screen.findByRole("button", { name: "Backend" }));
+    await user.click(await screen.findByRole("button", { name: "SDE-1" }));
+    await user.click(await screen.findByRole("button", { name: /skip/i }));
+    await user.type(await screen.findByRole("searchbox"), "red");
+    await user.click(await screen.findByRole("button", { name: "Redis" }));
+    await user.click(screen.getByRole("button", { name: /start/i }));
+    expect(onStart).toHaveBeenCalledWith({ profile: "Backend", level: "SDE-1", company: undefined, topic: "Redis" });
   });
 
   it("disables Start while starting", async () => {

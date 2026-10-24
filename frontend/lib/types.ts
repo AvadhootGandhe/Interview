@@ -4,7 +4,7 @@ export type CatalogApi = {
   profiles(): Promise<string[]>;
   levels(): Promise<string[]>;
   companies(q: string): Promise<string[]>;
-  topics(profile: string, company?: string): Promise<string[]>;
+  topics(profile: string, company?: string, q?: string): Promise<string[]>;
 };
 
 export type Turn = { messages: string[]; kind: string; state: "active" | "done"; audio_urls: string[]; transcript?: string | null };

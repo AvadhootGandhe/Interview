@@ -23,6 +23,7 @@ export default function SetupFlow({ api, onStart, starting = false }: Props) {
   const [query, setQuery] = useState("");
   const [companies, setCompanies] = useState<string[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
+  const [topicQuery, setTopicQuery] = useState("");
 
   useEffect(() => {
     api.profiles().then(setProfiles);
@@ -36,8 +37,10 @@ export default function SetupFlow({ api, onStart, starting = false }: Props) {
   }, [api, query]);
 
   useEffect(() => {
-    if (step === "topic" && sel.profile) api.topics(sel.profile, sel.company).then(setTopics);
-  }, [api, step, sel.profile, sel.company]);
+    if (step !== "topic" || !sel.profile) return;
+    const id = setTimeout(() => api.topics(sel.profile!, sel.company, topicQuery.trim() || undefined).then(setTopics), topicQuery ? 150 : 0);
+    return () => clearTimeout(id);
+  }, [api, step, sel.profile, sel.company, topicQuery]);
 
   const next = () => setStep(STEPS[STEPS.indexOf(step) + 1]);
   const back = () => setStep(STEPS[STEPS.indexOf(step) - 1]);
@@ -77,7 +80,8 @@ export default function SetupFlow({ api, onStart, starting = false }: Props) {
       )}
 
       {step === "topic" && (
-        <div className="flex flex-col items-center gap-6">
+        <div className="flex w-full flex-col items-center gap-6">
+          <SearchField placeholder="Search topics" value={topicQuery} onChange={(e) => setTopicQuery(e.target.value)} />
           <div className="flex flex-wrap justify-center gap-2">
             {topics.map((t) => (
               <Chip key={t} selected={sel.topic === t} onClick={() => setSel({ ...sel, topic: sel.topic === t ? undefined : t })}>{t}</Chip>

@@ -35,3 +35,4 @@ backend/data/followup_train.jsonl
 
 *.tsbuildinfo
 frontend/next-env.d.ts
+frontend/e2e/shots/

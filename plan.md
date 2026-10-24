@@ -260,6 +260,8 @@ models/    🖥 git-ignored (GGUF)
 - `/interview/[id]`: a centre orb (idle breathing, pulses while the interviewer speaks, blue while the user speaks), the current question as one calm line, one round mic button (hold, or Space), progress dots at the top, and everything else behind "•••".
 - `/report/[id]`: a score ring and a one-line verdict, one card per question (tap to expand the thread), strengths and gaps, then "Practice again".
 
+**Status:** [x] design tokens + UI kit, setup flow (role → level → company → topic, Skip, search), interview screen (orb, hold/Space mic, "•••" menu), report; 20 Vitest tests; `npm run build` passes; full browser flow verified with Playwright against `FAKE_LLM=1` (light 1440px, dark 390px, no console errors). Still open: formal minimalism checklist pass, real-mic check on a Mac.
+
 **Done when:** tests are green, every screen passes the minimalism checklist (`continuous_improvements.md`) in light and dark mode at 1440 px and 390 px, and G1 passes manually.
 
 ---

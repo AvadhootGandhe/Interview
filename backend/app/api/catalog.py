@@ -29,12 +29,15 @@ def levels(request: Request) -> list[str]:
 
 
 @router.get("/topics")
-def topics(request: Request, profile: str, company: str | None = None) -> list[str]:
-    sql = """select distinct t.name from question_map m
+def topics(request: Request, profile: str, company: str | None = None, q: str = "",
+           limit: int = Query(12, ge=1, le=100)) -> list[str]:
+    """Most-asked topics first (the full list is a wall of chips); `q` searches the rest."""
+    sql = """select t.name from question_map m
         join topics t on t.id = m.topic_id
         join profiles p on p.id = m.profile_id
         join companies c on c.id = m.company_id
-        where p.name = :profile and t.category != 'behavioral'"""
+        where p.name = :profile and t.category != 'behavioral' and t.name like :q"""
     if company:
         sql += " and c.name = :company"
-    return _rows(request, sql + " order by t.name", profile=profile, company=company)
+    sql += " group by t.name order by count(distinct m.question_id) desc, t.name limit :limit"
+    return _rows(request, sql, profile=profile, company=company, q=f"%{q}%", limit=limit)

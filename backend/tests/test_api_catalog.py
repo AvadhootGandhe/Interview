@@ -44,8 +44,20 @@ def test_levels_ordered_by_rank(client):
     assert client.get("/catalog/levels").json() == ["Fresher", "SDE-1", "SDE-1/2", "SDE-2/3", "Architect/Principal"]
 
 
-def test_topics_filtered_by_profile_and_company_sorted(client):
-    topics = client.get("/catalog/topics", params={"profile": "Backend", "company": "Amazon"}).json()
-    assert topics == sorted(topics) and "Kafka" in topics
+def test_topics_filtered_and_excludes_behavioral(client):
+    topics = client.get("/catalog/topics", params={"profile": "Backend", "company": "Amazon", "limit": 100}).json()
+    assert "Kafka" in topics
     assert "Behavioral & Leadership Principles (STAR)" not in topics  # behavioral is a later track
     assert client.get("/catalog/topics", params={"profile": "Nope"}).json() == []
+
+
+def test_topics_default_to_a_short_popular_list(client):
+    topics = client.get("/catalog/topics", params={"profile": "Backend"}).json()
+    everything = client.get("/catalog/topics", params={"profile": "Backend", "limit": 100}).json()
+    assert len(topics) == 12 < len(everything)
+    assert topics == everything[:12]  # most questions first
+
+
+def test_topics_search_finds_beyond_the_short_list(client):
+    hits = client.get("/catalog/topics", params={"profile": "Backend", "q": "kaf"}).json()
+    assert hits == ["Kafka"]

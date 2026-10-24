@@ -19,8 +19,8 @@ export const catalogApi: CatalogApi = {
   profiles: () => get("/catalog/profiles"),
   levels: () => get("/catalog/levels"),
   companies: (q) => get(`/catalog/companies?q=${encodeURIComponent(q)}`),
-  topics: (profile, company) =>
-    get(`/catalog/topics?profile=${encodeURIComponent(profile)}${company ? `&company=${encodeURIComponent(company)}` : ""}`),
+  topics: (profile, company, q) =>
+    get(`/catalog/topics?profile=${encodeURIComponent(profile)}${company ? `&company=${encodeURIComponent(company)}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
 };
 
 export const sessionApi: SessionApi = {
