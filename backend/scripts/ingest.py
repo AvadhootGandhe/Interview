@@ -14,9 +14,9 @@ from sqlalchemy.engine import Engine
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.db.models import Base  # noqa: E402
+from app.services.levels import LEVEL_RANK  # noqa: E402
 
 GENERAL = "General"
-LEVEL_RANK = {"Fresher": 1, "SDE-1": 2, "SDE-1/2": 3, "SDE-2/3": 4, "Architect/Principal": 5}
 SLUG_ID = re.compile(r"-(d?\d+)$")
 BATCH = 5000
 
