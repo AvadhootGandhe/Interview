@@ -1,13 +1,11 @@
 /**
- * Every backend call lives here, typed, so the shapes in plan.md can be
- * adjusted in one place once the FastAPI backend lands. Small `normalize*`
- * helpers accept a few likely variants (e.g. `greeting` vs `text`,
- * `["a"]` vs `[{name:"a"}]`) so the UI does not break on minor drift.
+ * Every backend call lives here, typed, so response shapes can be adjusted in
+ * one place. Shapes mirror backend/app/api/{catalog,sessions}.py.
  */
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
 
-export type SessionState = "greeting" | "asking" | "follow_up" | "closing" | "done" | (string & {});
+export const DEFAULT_TOTAL = 5;
 
 export interface Progress {
   current: number;
@@ -21,42 +19,56 @@ export interface SessionSetup {
   topic: string | null;
 }
 
-export interface SessionStart {
-  id: string;
-  /** The interviewer's greeting (backend may call it `greeting` or `text`). */
+export interface ReplyMessage {
+  kind: "greeting" | "ask" | "follow_up" | "closing" | (string & {});
   text: string;
-  audio_url?: string | null;
-  progress?: Progress;
 }
 
-export interface AnswerResult {
-  transcript: string;
-  text: string;
-  audio_url?: string | null;
-  state: SessionState;
-  progress: Progress;
+export interface EvaluationSummary {
+  satisfaction: number;
+  missing_points: string[];
+  mentioned_terms: string[];
 }
 
-export interface ReportQuestion {
-  question: string;
-  score: number;
-  /** Number of follow-ups needed, or the follow-up questions themselves. */
-  followups: number | string[];
-  feedback: string;
+/** POST /sessions, /sessions/{id}/answer and /sessions/{id}/end all answer with this. */
+export interface SessionReply {
+  session_id: string;
+  text: string;
+  kind: "ask" | "follow_up" | "closing" | (string & {});
+  state: "asking" | "done" | (string & {});
+  done: boolean;
+  /** 0-based index of the current question. */
+  question_index: number;
+  total_questions: number;
+  messages: ReplyMessage[];
+  audio_url?: string | null;
+  evaluation?: EvaluationSummary | null;
+  /** What the candidate said, when the answer was spoken (speech-to-text). */
+  transcript?: string | null;
 }
 
 export interface ThreadTurn {
-  role: "interviewer" | "candidate";
+  role: "interviewer" | "candidate" | (string & {});
   text: string;
 }
 
+export interface ReportQuestion {
+  question_id: string;
+  topic: string;
+  text: string;
+  final_score: number;
+  follow_ups: number;
+  thread: ThreadTurn[];
+  missing_points: string[];
+}
+
+/** GET /sessions/{id}/report */
 export interface Report {
-  overall: number;
-  verdict?: string;
-  questions: ReportQuestion[];
+  overall_score: number;
+  verdict: string;
   strengths: string[];
   gaps: string[];
-  thread: ThreadTurn[];
+  questions: ReportQuestion[];
 }
 
 export class ApiError extends Error {
@@ -68,8 +80,6 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
-
-export const DEFAULT_TOTAL = 5;
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
@@ -97,80 +107,44 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
-function normalizeNames(data: unknown): string[] {
-  const list = Array.isArray(data)
-    ? data
-    : data && typeof data === "object" && Array.isArray((data as { items?: unknown }).items)
-      ? (data as { items: unknown[] }).items
-      : [];
-  return list
-    .map((x) => (typeof x === "string" ? x : x && typeof x === "object" ? (x as { name?: unknown }).name : null))
-    .filter((x): x is string => typeof x === "string" && x.length > 0);
+export function progressOf(r: Pick<SessionReply, "question_index" | "total_questions">): Progress {
+  return { current: r.question_index + 1, total: Math.max(1, r.total_questions || DEFAULT_TOTAL) };
 }
 
-export function normalizeProgress(p: unknown, fallbackTotal = DEFAULT_TOTAL): Progress {
-  if (typeof p === "number") return { current: p, total: fallbackTotal };
-  if (p && typeof p === "object") {
-    const o = p as Partial<Progress>;
-    return { current: Number(o.current ?? 0), total: Number(o.total ?? fallbackTotal) };
-  }
-  return { current: 0, total: fallbackTotal };
+/** The one calm line to show: the last thing the interviewer said. */
+export function lineOf(r: SessionReply): string {
+  return r.messages.length ? r.messages[r.messages.length - 1].text : r.text;
 }
 
-function normalizeStart(raw: Record<string, unknown>): SessionStart {
-  const out: SessionStart = {
-    id: String(raw.id),
-    text: String(raw.greeting ?? raw.text ?? ""),
-    audio_url: (raw.audio_url as string | null | undefined) ?? null,
-  };
-  if (raw.progress !== undefined) out.progress = normalizeProgress(raw.progress);
-  return out;
+/** The interviewer's turns in a reply, for the transcript. */
+export function turnsOf(r: SessionReply): ThreadTurn[] {
+  const texts = r.messages.length ? r.messages.map((m) => m.text) : r.text ? [r.text] : [];
+  return texts.map((text) => ({ role: "interviewer", text }));
 }
 
-function normalizeAnswer(raw: Record<string, unknown>): AnswerResult {
-  return {
-    transcript: String(raw.transcript ?? ""),
-    text: String(raw.text ?? ""),
-    audio_url: (raw.audio_url as string | null | undefined) ?? null,
-    state: String(raw.state ?? "asking"),
-    progress: normalizeProgress(raw.progress),
-  };
-}
+const sid = encodeURIComponent;
 
 export const api = {
-  companies: async (q: string) => normalizeNames(await request(`/catalog/companies?q=${encodeURIComponent(q)}`)),
-  profiles: async () => normalizeNames(await request("/catalog/profiles")),
-  levels: async () => normalizeNames(await request("/catalog/levels")),
-  topics: async (profile?: string) =>
-    normalizeNames(
-      await request(`/catalog/topics${profile ? `?profile=${encodeURIComponent(profile)}` : ""}`),
-    ),
+  companies: (q: string) => request<string[]>(`/catalog/companies?q=${encodeURIComponent(q)}`),
+  profiles: () => request<string[]>("/catalog/profiles"),
+  levels: () => request<string[]>("/catalog/levels"),
+  topics: (profile?: string) =>
+    request<string[]>(`/catalog/topics${profile ? `?profile=${encodeURIComponent(profile)}` : ""}`),
 
-  createSession: async (setup: SessionSetup) =>
-    normalizeStart(await request<Record<string, unknown>>("/sessions", json(setup))),
+  createSession: (setup: SessionSetup) => request<SessionReply>("/sessions", json(setup)),
 
-  answerText: async (id: string, text: string) =>
-    normalizeAnswer(
-      await request<Record<string, unknown>>(`/sessions/${encodeURIComponent(id)}/answer`, json({ text })),
-    ),
+  answerText: (id: string, text: string) => request<SessionReply>(`/sessions/${sid(id)}/answer`, json({ text })),
 
-  answerAudio: async (id: string, audio: Blob) => {
+  answerAudio: (id: string, audio: Blob) => {
     const form = new FormData();
     const ext = audio.type.includes("mp4") ? "m4a" : audio.type.includes("ogg") ? "ogg" : "webm";
     form.append("audio", audio, `answer.${ext}`);
-    return normalizeAnswer(
-      await request<Record<string, unknown>>(`/sessions/${encodeURIComponent(id)}/answer`, {
-        method: "POST",
-        body: form,
-      }),
-    );
+    return request<SessionReply>(`/sessions/${sid(id)}/answer`, { method: "POST", body: form });
   },
 
-  endSession: async (id: string): Promise<void> => {
-    await request(`/sessions/${encodeURIComponent(id)}/end`, { method: "POST" });
-  },
+  endSession: (id: string) => request<SessionReply>(`/sessions/${sid(id)}/end`, { method: "POST" }),
 
-  report: (id: string) => request<Report>(`/sessions/${encodeURIComponent(id)}/report`),
+  report: (id: string) => request<Report>(`/sessions/${sid(id)}/report`),
 };
 
 /** Resolve a (possibly relative) audio URL from the API against its base. */

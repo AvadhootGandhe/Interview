@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { API_URL, ApiError, api, audioSrc } from "@/lib/api";
+import { API_URL, ApiError, api, audioSrc, lineOf, progressOf, turnsOf } from "@/lib/api";
+import * as fx from "@/test/fixtures";
 
 function mockFetch(body: unknown, init: { status?: number } = {}) {
   const fn = vi.fn(async () =>
@@ -21,8 +22,8 @@ describe("lib/api", () => {
     expect(API_URL).toBe("http://localhost:8000");
   });
 
-  it("searches companies with an encoded query and normalises names", async () => {
-    const fetch = mockFetch([{ id: 1, name: "Amazon" }, "Apple"]);
+  it("searches companies with an encoded query (the API returns plain names)", async () => {
+    const fetch = mockFetch(["Amazon", "Apple"]);
     const out = await api.companies("am az");
     expect(fetch).toHaveBeenCalledWith(
       "http://localhost:8000/catalog/companies?q=am%20az",
@@ -32,7 +33,7 @@ describe("lib/api", () => {
   });
 
   it("lists profiles, levels and topics", async () => {
-    const fetch = mockFetch({ items: ["Backend"] });
+    const fetch = mockFetch(["Backend"]);
     expect(await api.profiles()).toEqual(["Backend"]);
     await api.levels();
     await api.topics("Backend");
@@ -44,10 +45,11 @@ describe("lib/api", () => {
     ]);
   });
 
-  it("creates a session with JSON and accepts a `greeting` field", async () => {
-    const fetch = mockFetch({ id: "s9", greeting: "Hello there." });
+  it("creates a session with JSON and returns the real reply shape", async () => {
+    const fetch = mockFetch(fx.sessionStart);
     const out = await api.createSession({ profile: "Backend", level: "SDE-1", company: null, topic: null });
-    expect(out).toEqual({ id: "s9", text: "Hello there.", audio_url: null });
+    expect(out.session_id).toBe("s1");
+    expect(out.messages).toHaveLength(2);
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("http://localhost:8000/sessions");
     expect(init.method).toBe("POST");
@@ -60,25 +62,32 @@ describe("lib/api", () => {
   });
 
   it("sends a typed answer as JSON", async () => {
-    const fetch = mockFetch({ transcript: "hi", text: "ok", state: "asking", progress: { current: 1, total: 5 } });
+    const fetch = mockFetch(fx.answerReply);
     const out = await api.answerText("s1", "hi");
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("http://localhost:8000/sessions/s1/answer");
     expect(JSON.parse(init.body as string)).toEqual({ text: "hi" });
-    expect(out.progress).toEqual({ current: 1, total: 5 });
+    expect(out.kind).toBe("follow_up");
   });
 
   it("sends a recorded answer as multipart audio", async () => {
-    const fetch = mockFetch({ transcript: "hi", text: "ok", state: "asking", progress: 2 });
-    const out = await api.answerAudio("s1", new Blob(["x"], { type: "audio/webm" }));
+    const fetch = mockFetch(fx.answerReply);
+    await api.answerAudio("s1", new Blob(["x"], { type: "audio/webm" }));
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(init.body).toBeInstanceOf(FormData);
     expect((init.body as FormData).get("audio")).toBeInstanceOf(Blob);
-    expect(out.progress.current).toBe(2);
+  });
+
+  it("derives progress, the spoken line and turns from a reply", () => {
+    expect(progressOf(fx.sessionStart)).toEqual({ current: 1, total: 5 });
+    expect(progressOf(fx.answerReply)).toEqual({ current: 2, total: 5 });
+    expect(lineOf(fx.sessionStart)).toBe("How would you design a cache for a read-heavy API?");
+    expect(lineOf({ ...fx.answerReply, messages: [] })).toBe(fx.answerReply.text);
+    expect(turnsOf(fx.sessionStart).map((t) => t.role)).toEqual(["interviewer", "interviewer"]);
   });
 
   it("ends a session and fetches the report", async () => {
-    const fetch = mockFetch({ overall: 70, questions: [], strengths: [], gaps: [], thread: [] });
+    const fetch = mockFetch(fx.report);
     await api.endSession("s1");
     const report = await api.report("s1");
     const urls = fetch.mock.calls.map((c) => (c as unknown[])[0]);
@@ -86,7 +95,7 @@ describe("lib/api", () => {
       "http://localhost:8000/sessions/s1/end",
       "http://localhost:8000/sessions/s1/report",
     ]);
-    expect(report.overall).toBe(70);
+    expect(report.overall_score).toBe(78);
   });
 
   it("throws ApiError on a non-2xx response", async () => {

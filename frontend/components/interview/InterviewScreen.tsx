@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { api, audioSrc, DEFAULT_TOTAL, type AnswerResult, type Progress, type ThreadTurn } from "@/lib/api";
+import {
+  api,
+  audioSrc,
+  DEFAULT_TOTAL,
+  lineOf,
+  progressOf,
+  turnsOf,
+  type Progress,
+  type SessionReply,
+  type ThreadTurn,
+} from "@/lib/api";
 import { recallSession } from "@/lib/session";
 import { useRecorder } from "@/lib/useRecorder";
 import { Button, Orb, StatusLine, type OrbState } from "@/components/ui";
@@ -70,23 +80,21 @@ export function InterviewScreen({ id }: { id: string }) {
   useEffect(() => {
     const start = recallSession(id);
     if (!start) return;
-    setQuestion(start.text);
-    if (start.text) setTranscript([{ role: "interviewer", text: start.text }]);
-    if (start.progress) setProgress(start.progress);
+    setQuestion(lineOf(start));
+    setTranscript(turnsOf(start));
+    setProgress(progressOf(start));
     speak(start.audio_url);
     return stopAudio;
   }, [id, speak, stopAudio]);
 
   const apply = useCallback(
-    (res: AnswerResult) => {
-      setTranscript((t) => [
-        ...t,
-        ...(res.transcript ? [{ role: "candidate" as const, text: res.transcript }] : []),
-        ...(res.text ? [{ role: "interviewer" as const, text: res.text }] : []),
-      ]);
-      if (res.text) setQuestion(res.text);
-      setProgress((p) => ({ current: res.progress.current || p.current, total: res.progress.total || p.total }));
-      if (res.state === "done") {
+    (res: SessionReply, typed?: string) => {
+      const said = res.transcript || typed;
+      setTranscript((t) => [...t, ...(said ? [{ role: "candidate" as const, text: said }] : []), ...turnsOf(res)]);
+      const line = lineOf(res);
+      if (line) setQuestion(line);
+      setProgress(progressOf(res));
+      if (res.done) {
         setDone(true);
         setMenuOpen(false);
       }
@@ -96,13 +104,13 @@ export function InterviewScreen({ id }: { id: string }) {
   );
 
   const send = useCallback(
-    async (call: () => Promise<AnswerResult>) => {
+    async (call: () => Promise<SessionReply>, typed?: string) => {
       setSending(true);
       setProblem(null);
       try {
-        apply(await call());
+        apply(await call(), typed);
       } catch {
-        setProblem({ kind: "send", retry: () => void send(call) });
+        setProblem({ kind: "send", retry: () => void send(call, typed) });
       } finally {
         setSending(false);
       }
@@ -225,7 +233,7 @@ export function InterviewScreen({ id }: { id: string }) {
           transcript={transcript}
           busy={sending}
           focusAnswer={focusAnswer}
-          onSend={(text) => void send(() => api.answerText(id, text))}
+          onSend={(text) => void send(() => api.answerText(id, text), text)}
           onEnd={end}
           onClose={() => setMenuOpen(false)}
         />

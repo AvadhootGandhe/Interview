@@ -46,14 +46,10 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-function followupCount(q: ReportQuestion): number {
-  return Array.isArray(q.followups) ? q.followups.length : Number(q.followups) || 0;
-}
-
 function QuestionCard({ q }: { q: ReportQuestion }) {
   const [open, setOpen] = useState(false);
   const panel = useId();
-  const n = followupCount(q);
+  const n = q.follow_ups;
   return (
     <Card className="p-0">
       <button
@@ -63,23 +59,21 @@ function QuestionCard({ q }: { q: ReportQuestion }) {
         onClick={() => setOpen((o) => !o)}
         className="flex w-full min-h-tap items-start justify-between gap-4 rounded-lg p-5 text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/30"
       >
-        <span className="text-body text-fg">{q.question}</span>
-        <span className="text-body font-medium tabular-nums text-fg">{clamp(q.score)}</span>
+        <span className="text-body text-fg">{q.text}</span>
+        <span className="text-body font-medium tabular-nums text-fg">{clamp(q.final_score)}</span>
       </button>
       {open && (
         <div id={panel} className="flex flex-col gap-2 px-5 pb-5">
-          {q.feedback && <p className="text-body text-muted">{q.feedback}</p>}
+          {q.missing_points.map((m, i) => (
+            <p key={i} className="text-body text-muted">
+              {m}
+            </p>
+          ))}
           {n > 0 && (
             <p className="text-caption text-muted">
               {n} follow-up{n === 1 ? "" : "s"}
             </p>
           )}
-          {Array.isArray(q.followups) &&
-            q.followups.filter(Boolean).map((f, i) => (
-              <p key={i} className="text-caption text-muted">
-                {f}
-              </p>
-            ))}
         </div>
       )}
     </Card>
@@ -104,12 +98,13 @@ function List({ title, items }: { title: string; items: string[] }) {
 
 export function ReportView({ report }: { report: Report }) {
   const [threadOpen, setThreadOpen] = useState(false);
+  const thread = report.questions.flatMap((q) => q.thread);
   const threadId = useId();
   return (
     <main className="mx-auto flex w-full max-w-content flex-col gap-12 px-6 pb-16 pt-[10vh]">
       <header className="flex flex-col items-center gap-5 text-center">
-        <ScoreRing score={report.overall} />
-        <p className="text-body text-fg">{report.verdict || verdictFor(clamp(report.overall))}</p>
+        <ScoreRing score={report.overall_score} />
+        <p className="text-body text-fg">{report.verdict || verdictFor(clamp(report.overall_score))}</p>
       </header>
 
       {report.questions.length > 0 && (
@@ -123,7 +118,7 @@ export function ReportView({ report }: { report: Report }) {
       <List title="Strengths" items={report.strengths} />
       <List title="To work on" items={report.gaps} />
 
-      {report.thread.length > 0 && (
+      {thread.length > 0 && (
         <section className="flex flex-col gap-3">
           <button
             type="button"
@@ -148,7 +143,7 @@ export function ReportView({ report }: { report: Report }) {
           </button>
           {threadOpen && (
             <ol id={threadId} className="flex flex-col gap-3">
-              {report.thread.map((t, i) => (
+              {thread.map((t, i) => (
                 <li key={i} className={cx("text-body", t.role === "candidate" ? "text-fg" : "text-muted")}>
                   <span className="sr-only">{t.role === "candidate" ? "You: " : "Interviewer: "}</span>
                   {t.text}

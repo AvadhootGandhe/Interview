@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { api } from "@/lib/api";
+import { api, lineOf } from "@/lib/api";
 import { InterviewScreen } from "@/components/interview/InterviewScreen";
 import { rememberSession } from "@/lib/session";
 import * as fx from "@/test/fixtures";
@@ -54,7 +54,7 @@ const recorder = () => FakeRecorder.instances[FakeRecorder.instances.length - 1]
 describe("interview screen", () => {
   it("shows the greeting as one calm line, an idle orb, the mic and progress", () => {
     render(<InterviewScreen id="s1" />);
-    expect(screen.getByText(fx.sessionStart.text)).toBeInTheDocument();
+    expect(screen.getByText(lineOf(fx.sessionStart))).toBeInTheDocument();
     expect(screen.getByTestId("orb")).toHaveAttribute("data-state", "idle");
     expect(screen.getByRole("button", { name: "Hold to talk" })).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuemax", "5");
@@ -64,7 +64,7 @@ describe("interview screen", () => {
   });
 
   it("holding the mic button records, and releasing sends the audio", async () => {
-    const answer = vi.spyOn(api, "answerAudio").mockResolvedValue(fx.answerResult);
+    const answer = vi.spyOn(api, "answerAudio").mockResolvedValue(fx.answerReply);
     render(<InterviewScreen id="s1" />);
     const mic = screen.getByRole("button", { name: "Hold to talk" });
 
@@ -77,12 +77,12 @@ describe("interview screen", () => {
     fireEvent.pointerUp(mic);
     expect(recorder().stop).toHaveBeenCalled();
     await waitFor(() => expect(answer).toHaveBeenCalledWith("s1", expect.any(Blob)));
-    expect(await screen.findByText(fx.answerResult.text)).toBeInTheDocument();
+    expect(await screen.findByText(fx.answerReply.text)).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "2");
   });
 
   it("pressing and releasing Space starts and stops recording", async () => {
-    const answer = vi.spyOn(api, "answerAudio").mockResolvedValue(fx.answerResult);
+    const answer = vi.spyOn(api, "answerAudio").mockResolvedValue(fx.answerReply);
     render(<InterviewScreen id="s1" />);
 
     fireEvent.keyDown(window, { key: " ", code: "Space" });
@@ -99,7 +99,7 @@ describe("interview screen", () => {
   it("stops cleanly when released before the microphone is ready", async () => {
     let resolve: (v: unknown) => void = () => {};
     getUserMedia.mockReturnValue(new Promise((r) => (resolve = r)));
-    const answer = vi.spyOn(api, "answerAudio").mockResolvedValue(fx.answerResult);
+    const answer = vi.spyOn(api, "answerAudio").mockResolvedValue(fx.answerReply);
     render(<InterviewScreen id="s1" />);
     const mic = screen.getByRole("button", { name: "Hold to talk" });
     fireEvent.pointerDown(mic);
@@ -120,19 +120,19 @@ describe("interview screen", () => {
   });
 
   it("the ••• menu holds the transcript, the typed-answer box and End", async () => {
-    const answer = vi.spyOn(api, "answerText").mockResolvedValue(fx.answerResult);
-    const end = vi.spyOn(api, "endSession").mockResolvedValue(undefined);
+    const answer = vi.spyOn(api, "answerText").mockResolvedValue(fx.answerReply);
+    const end = vi.spyOn(api, "endSession").mockResolvedValue(fx.closingReply);
     const user = userEvent.setup();
     render(<InterviewScreen id="s1" />);
 
     await user.click(screen.getByRole("button", { name: "More" }));
     const menu = screen.getByRole("dialog", { name: "More" });
-    expect(within(menu).getByText(fx.sessionStart.text)).toBeInTheDocument();
+    expect(within(menu).getByText("Hi, I'm your interviewer today.")).toBeInTheDocument();
 
     await user.type(within(menu).getByRole("textbox", { name: "Type your answer" }), "Use Redis");
     await user.click(within(menu).getByRole("button", { name: "Send" }));
     await waitFor(() => expect(answer).toHaveBeenCalledWith("s1", "Use Redis"));
-    expect(await within(menu).findByText(fx.answerResult.transcript)).toBeInTheDocument();
+    expect(await within(menu).findByText("Use Redis")).toBeInTheDocument();
 
     await user.click(within(menu).getByRole("button", { name: "End interview" }));
     await waitFor(() => expect(end).toHaveBeenCalledWith("s1"));
@@ -149,12 +149,7 @@ describe("interview screen", () => {
   });
 
   it("swaps the mic for a single report button when the interview is done", async () => {
-    vi.spyOn(api, "answerText").mockResolvedValue({
-      ...fx.answerResult,
-      text: "That's all from me. Thank you!",
-      state: "done",
-      progress: { current: 5, total: 5 },
-    });
+    vi.spyOn(api, "answerText").mockResolvedValue(fx.closingReply);
     const user = userEvent.setup();
     render(<InterviewScreen id="s1" />);
     await user.click(screen.getByRole("button", { name: "More" }));
@@ -170,7 +165,7 @@ describe("interview screen", () => {
     const answer = vi
       .spyOn(api, "answerAudio")
       .mockRejectedValueOnce(new Error("boom"))
-      .mockResolvedValueOnce(fx.answerResult);
+      .mockResolvedValueOnce(fx.answerReply);
     const user = userEvent.setup();
     render(<InterviewScreen id="s1" />);
     const mic = screen.getByRole("button", { name: "Hold to talk" });
@@ -180,6 +175,6 @@ describe("interview screen", () => {
     expect(await screen.findByText("Couldn’t send your answer.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(answer).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText(fx.answerResult.text)).toBeInTheDocument();
+    expect(await screen.findByText(fx.answerReply.text)).toBeInTheDocument();
   });
 });

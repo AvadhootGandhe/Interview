@@ -47,7 +47,7 @@ export function SetupFlow() {
     try {
       const session = await api.createSession({ profile, level, company, topic });
       rememberSession(session);
-      router.push(`/interview/${encodeURIComponent(session.id)}`);
+      router.push(`/interview/${encodeURIComponent(session.session_id)}`);
     } catch {
       setStartError(true);
       setStarting(false);

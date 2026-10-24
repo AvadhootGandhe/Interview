@@ -9,10 +9,10 @@ describe("report", () => {
   it("renders the overall score, verdict and per-question scores", () => {
     render(<ReportView report={fx.report} />);
     expect(screen.getByRole("img", { name: "Overall score 78 out of 100" })).toBeInTheDocument();
-    expect(screen.getByText(fx.report.verdict!)).toBeInTheDocument();
+    expect(screen.getByText(fx.report.verdict)).toBeInTheDocument();
     for (const q of fx.report.questions) {
-      expect(screen.getByText(q.question)).toBeInTheDocument();
-      expect(screen.getByText(String(q.score))).toBeInTheDocument();
+      expect(screen.getByText(q.text)).toBeInTheDocument();
+      expect(screen.getByText(String(q.final_score))).toBeInTheDocument();
     }
   });
 
@@ -27,9 +27,10 @@ describe("report", () => {
   it("keeps per-question feedback and the full thread collapsed until tapped", async () => {
     const user = userEvent.setup();
     render(<ReportView report={fx.report} />);
-    expect(screen.queryByText("Clear layering and eviction choice.")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /How would you design a cache/ }));
-    expect(screen.getByText("Clear layering and eviction choice.")).toBeInTheDocument();
+    expect(screen.queryByText("write-through versus write-behind trade-offs")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /How do you keep a cache/ }));
+    expect(screen.getByText("write-through versus write-behind trade-offs")).toBeInTheDocument();
+    expect(screen.getByText("2 follow-ups")).toBeInTheDocument();
 
     const toggle = screen.getByRole("button", { name: "Full conversation" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -40,7 +41,7 @@ describe("report", () => {
   });
 
   it("derives a verdict when the API sends none, and offers Practice again", () => {
-    render(<ReportView report={{ ...fx.report, verdict: undefined, overall: 90 }} />);
+    render(<ReportView report={{ ...fx.report, verdict: "", overall_score: 90 }} />);
     expect(screen.getByText("Excellent interview.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Practice again" })).toHaveAttribute("href", "/");
   });
@@ -55,7 +56,7 @@ describe("report", () => {
     expect(screen.getByText("Preparing your report…")).toBeInTheDocument();
     expect(await screen.findByText("Couldn’t load your report.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByText(fx.report.verdict!)).toBeInTheDocument();
+    expect(await screen.findByText(fx.report.verdict)).toBeInTheDocument();
     expect(spy).toHaveBeenCalledWith("s1");
   });
 });
