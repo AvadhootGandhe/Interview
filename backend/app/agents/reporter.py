@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db import models as m
 
 PROMPT = (Path(__file__).resolve().parents[1] / "prompts" / "reporter.md").read_text()
@@ -89,7 +90,7 @@ async def build_report(engine: Engine, llm, session_id: str) -> Report:
               .replace("{results}", results))
     verdict = strengths = gaps = None
     try:
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", (await llm.complete(prompt, max_tokens=500)).strip())
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", (await llm.complete(prompt, max_tokens=500, model=settings.cheap_model)).strip())
         data = json.loads(raw)
         verdict, strengths, gaps = str(data["verdict"]), list(data["strengths"]), list(data["gaps"])
     except Exception:

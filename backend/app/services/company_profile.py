@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from sqlalchemy import text
+
+from app.config import settings
 from sqlalchemy.engine import Engine
 
 GENERAL = "General"
@@ -63,7 +65,7 @@ async def get_company_profile(engine: Engine, llm, company: str | None, profile:
                            level_clause=f" at {level} level" if level else "",
                            questions="\n".join(f"- {s}" for s in sample))
     try:
-        summary = (await llm.complete(prompt, max_tokens=250)).strip()
+        summary = (await llm.complete(prompt, max_tokens=250, model=settings.cheap_model)).strip()
     except Exception:
         return CompanyProfileData(mix, "")  # degrade to the SQL mix; retry next time
     if summary:

@@ -88,7 +88,7 @@ async def plan_interview(llm, pack: ContextPack, n: int = DEFAULT_SEGMENTS) -> I
               .replace("{pack}", pack.to_prompt()))
     for _ in range(2):  # first try + one retry
         try:
-            plan = _parse(await llm.complete(prompt, max_tokens=900))
+            plan = _parse(await llm.complete(prompt, max_tokens=900, think=True, effort="medium"))
         except Exception:
             plan = None
         if plan and not validate_plan(plan, pack):

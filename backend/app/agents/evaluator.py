@@ -45,7 +45,7 @@ async def evaluate(llm, profile: str, level: str, thread: list[tuple[str, str]])
               .replace("{rubric}", level_rubric(level)).replace("{thread}", rendered))
     for _ in range(2):  # first try + one retry
         try:
-            ev = _parse(await llm.complete(prompt, max_tokens=700, temperature=0))
+            ev = _parse(await llm.complete(prompt, max_tokens=700, think=True, effort="medium"))
         except Exception:
             ev = None
         if ev:
