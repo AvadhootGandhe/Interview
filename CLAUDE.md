@@ -18,6 +18,8 @@ Read these first, in order:
 ```bash
 cd backend && pytest -m "not local" -q            # cloud-safe tests
 cd backend && uvicorn app.main:app --reload        # API on :8000
+cd backend && python -m scripts.text_interview --company Amazon --debug   # terminal interview (FAKE_LLM=1 for offline)
+cd backend && python -m scripts.run_evals [--flow] [--dry-run]            # G3 / G9-G10 evals (real key)
 cd frontend && npm run dev                         # UI on :3000
 llama-server -m models/interviewer-q4_k_m.gguf --port 8081 -c 2048 -ngl 99   # local only
 ```

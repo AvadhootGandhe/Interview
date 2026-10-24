@@ -1,0 +1,10 @@
+{"id": "s01", "profile": "Backend", "level": "SDE-2/3", "company": "Amazon", "topic": null, "persona": "strong", "mentions": ["redis"]}
+{"id": "s02", "profile": "Backend", "level": "Fresher", "company": "Google", "topic": null, "persona": "mixed", "mentions": []}
+{"id": "s03", "profile": "Backend", "level": "SDE-1/2", "company": "Stripe", "topic": "Caching", "persona": "mixed", "mentions": ["redis"]}
+{"id": "s04", "profile": "DevOps", "level": "SDE-1/2", "company": "Google", "topic": null, "persona": "strong", "mentions": ["kubernetes"]}
+{"id": "s05", "profile": "AI Engineer", "level": "Architect/Principal", "company": "Amazon", "topic": null, "persona": "mixed", "mentions": []}
+{"id": "s06", "profile": "Data Engineer", "level": "SDE-2/3", "company": "Stripe", "topic": null, "persona": "weak", "mentions": ["kafka"]}
+{"id": "s07", "profile": "ML Engineer", "level": "SDE-1", "company": "Google", "topic": null, "persona": "strong", "mentions": []}
+{"id": "s08", "profile": "Fullstack", "level": "SDE-1", "company": "Amazon", "topic": "Caching", "persona": "weak", "mentions": []}
+{"id": "s09", "profile": "Backend", "level": "SDE-2/3", "company": null, "topic": null, "persona": "mixed", "mentions": ["kafka"]}
+{"id": "s10", "profile": "Database Developer", "level": "SDE-1/2", "company": null, "topic": null, "persona": "strong", "mentions": ["postgres"]}

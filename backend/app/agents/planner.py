@@ -85,11 +85,19 @@ def fallback_plan(pool: list[PoolItem], filters: Filters) -> InterviewPlan:
         raise PlanError("the question pool is empty")
     n = min(5, len(items))
     topic, need = _topic_need(filters, items, n)
-    chosen: list[PoolItem] = []
-    if topic:
-        chosen = _spread([p for p in items if p.topic.lower() == topic], need)
-    rest = [p for p in items if p not in chosen]
-    chosen += _spread(rest, n - len(chosen))
+
+    # Few topics, so the interview stays on one theme and then moves once: the chosen (or largest)
+    # topic first, then the next largest.
+    by_topic: dict[str, list[PoolItem]] = {}
+    for p in items:
+        by_topic.setdefault(p.topic, []).append(p)
+    ranked = sorted(by_topic.values(), key=lambda g: (g[0].topic.lower() != (topic or ""), -len(g), g[0].topic))
+    first_share = need if topic else math.ceil(n / 2)
+    chosen: list[PoolItem] = _spread(ranked[0], min(first_share, len(ranked[0])))
+    if len(ranked) > 1:
+        chosen += _spread(ranked[1], min(n - len(chosen), len(ranked[1])))
+    if len(chosen) < n:  # small groups: top up from anything left
+        chosen += _spread([p for p in items if p not in chosen], n - len(chosen))
 
     groups: dict[str, list[PoolItem]] = {}
     for p in chosen:

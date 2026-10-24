@@ -166,7 +166,7 @@ models/    🖥 git-ignored (GGUF)
 - [x] Retriever: widening `exact → drop_company → general → drop_level → drop_topic → profile_only`; never empty; recent-session exclusion; ≤ 40% per topic; behavioral topics only when asked for.
 - [x] Company profile (topic mix by SQL, summary via an injected LLM client, cached in `company_profiles`) and context pack (≤ 3K tokens, generator fallback).
 - [ ] 🖥 Run the full ingest and `pytest -m local tests/test_ingest_full_live.py` (< 15 min, ~131K questions, ~3.86M mappings, FTS "idempotency" < 50 ms).
-- [ ] Wire the company-profile summary to `claude_client` (Claude Haiku) once it exists in Phase 3; tests use the FakeLLM.
+- [x] Company-profile summary wired to `claude_client` (Phase 3): it calls `complete(task="company_profile", model=settings.cheap_model)` (Haiku); tests use the fakes.
 
 ---
 
@@ -225,6 +225,17 @@ models/    🖥 git-ignored (GGUF)
 - one deliberately weak answer triggers a relevant follow-up;
 - mentioning a technology (for example, Redis) leads to a bridged next question;
 - the questions clearly build from warm-up to stretch.
+
+**Status:**
+- [x] Tests written first for every item below, then the code (suite: 119 -> 223 green with `-m "not local"`).
+- [x] `app/llm/claude_client.py` (SDK wrapper: structured output via `output_config.format`, `effort`, refusal handling, no sampling params), `app/llm/fake.py` (offline `DemoLLM` for `FAKE_LLM=1`), `app/llm/factory.py`.
+- [x] `app/agents/{base,schemas,planner,evaluator,interviewer,reporter,orchestrator}.py`, `app/services/flow.py` (pure rules), prompts in `app/prompts/{planner,evaluator,interviewer,reporter}.md`.
+- [x] `app/api/sessions.py` (`POST /sessions`, `/answer`, `/end`, `GET /report`), `scripts/text_interview.py`.
+- [x] Planner copes with small pools (segments = min(4..6, pool size); the fallback plan is valid on every pool in the sample, including tiny companies such as AI21).
+- [x] Eval sets `backend/evals/answers.jsonl` (34 labeled answers) and `backend/evals/sessions.jsonl` (10 scripted sessions); `scripts/run_evals.py` (G3, and `--flow` for G9/G10; `--dry-run` runs the harness on the DemoLLM).
+- [ ] Run `python -m scripts.run_evals` with a real `ANTHROPIC_API_KEY`: G3 >= 80% on `answers.jsonl`.
+- [ ] Run `python -m scripts.run_evals --flow` on the full ingested DB: G9 (coherence >= 4, <= 1 abrupt jump) and G10 (company relevance >= 4).
+- [ ] Terminal acceptance run with real Claude (`python -m scripts.text_interview`): a weak answer triggers a relevant follow-up, mentioning Redis leads to a bridged question, questions build from warm-up to stretch.
 
 ---
 
@@ -305,3 +316,9 @@ models/    🖥 git-ignored (GGUF)
 | 2026-10-24 | A company with ≥ 12 exact matches caps the widened share of its pool so ≥ 70% stays company-specific (pool can be < 40) | G10 (goal.md) wins; keeps the plan's widening order intact. Sparse companies widen freely (G5) |
 | 2026-10-24 | Behavioral topics (STAR, leadership) are left out of pools and the topic catalog unless chosen explicitly | MVP is technical screening only (goal.md Scope) |
 | 2026-10-24 | Company profile LLM failure → a one-line topic summary, not cached | The profile is optional context and must never block an interview |
+| 2026-10-24 | Phase 3 models: planner/evaluator/reporter = `claude-sonnet-5-5`, interviewer/company profile = `claude-haiku-5-5`, all in `config.py` | Evaluator accuracy matters most; the interviewer speaks every turn so latency wins. No sampling params are sent (removed on current models) |
+| 2026-10-24 | The flow controller takes the retriever's FTS `search` as an injected function (default: in-memory keyword match) | Keeps `next_segment` a pure function while the orchestrator still uses FTS5 |
+| 2026-10-24 | A bridge swaps the matched later question with the next one (two segments change, no id lost or repeated) | "Move it up" must not duplicate the question left in its old slot |
+| 2026-10-24 | Orchestrator does its LLM work first, then saves a whole step in one commit; extra `session_states` table instead of new columns | No SQLite write lock held across API calls; existing ingested DBs need no migration |
+| 2026-10-24 | The interviewer checks that a reworded question keeps the seed's meaning with a cheap word-overlap rule and falls back to the seed text; the LLM judge is only used in evals | An extra judge call per turn would cost latency (G4) |
+| 2026-10-24 | The fallback plan uses at most two topic groups (the chosen or largest first) | Five questions from five topics scored 3+ abrupt jumps in the dry run |
