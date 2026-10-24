@@ -287,4 +287,5 @@ models/    🖥 git-ignored (GGUF)
 | 2026-10-24 | Retrieval (RAG) context pack: company profile + filtered question pool, given to the planner and interviewer | Claude asks in the company's real style instead of rewording one random question |
 | 2026-10-24 | FTS5 keyword search before embeddings | Built into SQLite, uses no extra RAM on the 8 GB Mac; embeddings only if the metrics need them |
 | 2026-10-24 | Planner (one Claude call at start) + rule-based flow controller between questions | Interview flows warm-up → stretch and reacts to answers, with no extra latency per turn |
+| 2026-10-24 | Retriever keeps a chosen company through level/topic widening before dropping to other companies/General | Needed to meet G10 (≥70% company-specific) when one level has only ~24 company questions |
 | 2026-10-24 | Generator prompt unchanged; company flavour comes from retrieval + Claude | The LoRA was trained without company input |
