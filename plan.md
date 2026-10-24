@@ -260,8 +260,10 @@ models/    🖥 git-ignored (GGUF)
 **Status:**
 - [x] `tests/test_stt.py`, `tests/test_tts.py`, `tests/test_api_audio.py` written first (26 tests), then `app/speech/stt.py`, `app/speech/tts.py`, `app/api/audio.py` (registered in `app/main.py`). Cloud suite: 145 green.
 - [x] 🖥 Live: `tests/test_speech_live.py` (marked local). mlx-whisper `whisper-base.en-mlx` on `tests/fixtures/hello.wav` (made with `say` + ffmpeg, 139 KB): WER 0.0 (limit 15%). Kokoro-82M voice `af_heart`: 0.44 s for one sentence after warm-up (limit 1 s). Mac-only deps in `backend/requirements-local.txt`.
-- [ ] `tests/test_api_sessions.py`: the answer endpoint accepts multipart audio (owned by the Phase 3 sessions API; wire `SpeechToText` and `TextToSpeech` into it, same interface as `FakeSTT`/`FakeTTS`).
-- [ ] 🖥 End to end: a recorded browser answer (webm) in, spoken interviewer audio out (needs the sessions API and frontend; ffmpeg conversion of webm is only unit-tested with a fake).
+- [x] The answer endpoint accepts multipart audio or JSON text; every interviewer reply carries `audio_url` (null if TTS fails or speech is off); silent audio gives a calm 422 `no_speech` and does not advance; STT/TTS injected via `app/speech/deps.py` (`SPEECH=auto|real|fake|off`); `Server-Timing` per stage; `backend/API.md` documents the shapes. Tests first in `tests/test_api_voice.py` (12 tests). Cloud suite: 261 green.
+- [x] 🖥 End to end without a browser: `tests/test_voice_live.py` (marked local) posts `hello.wav` through real STT, DemoLLM and real TTS; transcript contains 'hello' and the audio is served from `/audio/`. Passes.
+- [x] 🖥 `scripts/bench_latency.py` written. Measured with FAKE LLM + real STT/TTS (6 audio turns): end of answer to audio ready p50 2.85 s, p95 4.16 s; STT p50 0.27 s, TTS p50 2.45 s. **G4 not claimed**: needs a run with a real `ANTHROPIC_API_KEY`.
+- [ ] 🖥 Real-browser webm E2E (frontend) and the G4 bench with real Claude.
 
 ---
 
