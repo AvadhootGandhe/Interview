@@ -64,7 +64,7 @@ class CompanyProfile(Base):
     id = Column(Integer, primary_key=True)
     company_id = Column(ForeignKey("companies.id"), nullable=False)
     profile_id = Column(ForeignKey("profiles.id"), nullable=False)
-    level_id = Column(ForeignKey("levels.id"), nullable=False)
+    level_id = Column(ForeignKey("levels.id"))
     topic_mix_json = Column(Text, nullable=False)
     summary = Column(Text)
     updated_at = Column(DateTime, server_default=func.now())
