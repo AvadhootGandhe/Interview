@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     evaluator_model: str = "claude-sonnet-5-5"
     cheap_model: str = "claude-haiku-5-5"
     fake_llm: bool = False
+    speech_enabled: bool = False  # local-only: mlx-whisper + Kokoro
 
     pool_size: int = 40
     max_context_tokens: int = 3000

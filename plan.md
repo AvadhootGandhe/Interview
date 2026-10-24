@@ -233,6 +233,8 @@ models/    🖥 git-ignored (GGUF)
 
 **Implement:** `app/speech/stt.py` (mlx-whisper `base.en`), `app/speech/tts.py` (Kokoro, one voice, cached), and audio served at `/audio/{file}`.
 
+**Status:** [x] `stt.py`, `tts.py` (+ mlx-whisper / Kokoro engines, unverified until run on the Mac), `/sessions/{id}/audio`, `/audio/{file}`, tests with fakes. 🖥 live engine tests still to do.
+
 **Done when:** tests are green. 🖥 A recorded answer goes in and spoken interviewer audio comes out.
 
 ---

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -24,11 +24,22 @@ class Turn(BaseModel):
     kind: str
     state: str
     satisfaction: int | None = None
+    transcript: str | None = None
+    audio_urls: list[str] = []
 
 
 class Created(BaseModel):
     session_id: str
     messages: list[str]
+    audio_urls: list[str] = []
+
+
+async def _speak(request: Request, messages: list[str]) -> list[str]:
+    tts = request.app.state.tts
+    if tts is None:
+        return []
+    urls = [await tts.synthesize(m) for m in messages]
+    return urls if all(urls) else []
 
 
 def _known_profile(request: Request, profile: str) -> bool:
@@ -41,10 +52,11 @@ async def create(body: CreateSession, request: Request) -> Created:
     if not _known_profile(request, body.profile):
         raise HTTPException(422, f"unknown profile: {body.profile}")
     started = await request.app.state.orchestrator.start(Filters(**body.model_dump()))
-    return Created(session_id=started.session_id, messages=started.messages)
+    return Created(session_id=started.session_id, messages=started.messages,
+                   audio_urls=await _speak(request, started.messages))
 
 
-async def _run(call):
+async def _run(call, request: Request, transcript: str | None = None):
     try:
         reply = await call
     except KeyError:
@@ -52,19 +64,31 @@ async def _run(call):
     except ValueError as exc:
         raise HTTPException(409, str(exc))
     return Turn(messages=reply.messages, kind=reply.kind, state=reply.state,
-                satisfaction=reply.evaluation.satisfaction if reply.evaluation else None)
+                satisfaction=reply.evaluation.satisfaction if reply.evaluation else None,
+                transcript=transcript, audio_urls=await _speak(request, reply.messages))
 
 
 @router.post("/{session_id}/answer")
 async def answer(session_id: str, body: Answer, request: Request) -> Turn:
     if not body.text.strip():
         raise HTTPException(422, "answer is empty")
-    return await _run(request.app.state.orchestrator.answer(session_id, body.text.strip()))
+    return await _run(request.app.state.orchestrator.answer(session_id, body.text.strip()), request)
+
+
+@router.post("/{session_id}/audio")
+async def answer_audio(session_id: str, request: Request, audio: UploadFile = File(...)) -> Turn:
+    stt = request.app.state.stt
+    if stt is None:
+        raise HTTPException(501, "speech input is not enabled")
+    transcript = (await stt.transcribe(await audio.read())).strip()
+    if not transcript:
+        raise HTTPException(422, "Sorry, I couldn't hear that. Please try again.")
+    return await _run(request.app.state.orchestrator.answer(session_id, transcript), request, transcript)
 
 
 @router.post("/{session_id}/end")
 async def end(session_id: str, request: Request) -> Turn:
-    return await _run(request.app.state.orchestrator.end(session_id))
+    return await _run(request.app.state.orchestrator.end(session_id), request)
 
 
 @router.get("/{session_id}/report")

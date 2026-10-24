@@ -71,3 +71,57 @@ def test_unknown_profile_is_a_clean_422(client):
 def test_empty_answer_is_rejected(client):
     sid = client.post("/sessions", json=BODY).json()["session_id"]
     assert client.post(f"/sessions/{sid}/answer", json={"text": "  "}).status_code == 422
+
+
+# ---- speech ---------------------------------------------------------------------------------
+from tests.conftest import FakeSTT, FakeTTS  # noqa: E402
+
+
+@pytest.fixture
+def speech_client(tmp_path):
+    eng = create_engine(f"sqlite:///{tmp_path / 'sp.db'}", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng)
+    ingest(ROOT / "data" / "sample_questions.json", eng, ALIASES)
+    stt = FakeSTT(STRONG)
+    app = create_app(eng, llm=FakeInterviewLLM(), generator=NoGenerator(), followup_log=tmp_path / "f.jsonl",
+                     stt=stt, tts=FakeTTS(), audio_dir=tmp_path / "audio")
+    (tmp_path / "audio").mkdir()
+    (tmp_path / "audio" / "fake.wav").write_bytes(b"RIFFdata")
+    return TestClient(app), stt
+
+
+def test_create_returns_audio_url_per_message(speech_client):
+    client, _ = speech_client
+    data = client.post("/sessions", json=BODY).json()
+    assert data["audio_urls"] == ["/audio/fake.wav"] * len(data["messages"])
+
+
+def test_audio_answer_is_transcribed_then_processed(speech_client):
+    client, _ = speech_client
+    sid = client.post("/sessions", json=BODY).json()["session_id"]
+    r = client.post(f"/sessions/{sid}/audio", files={"audio": ("a.webm", b"bytes", "audio/webm")})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["transcript"] == STRONG and data["kind"] == "ask"
+    assert data["audio_urls"] == ["/audio/fake.wav"]
+
+
+def test_unintelligible_audio_gets_calm_422(speech_client):
+    client, stt = speech_client
+    stt.text = ""
+    sid = client.post("/sessions", json=BODY).json()["session_id"]
+    r = client.post(f"/sessions/{sid}/audio", files={"audio": ("a.webm", b"x", "audio/webm")})
+    assert r.status_code == 422 and "hear" in r.json()["detail"].lower()
+
+
+def test_audio_files_are_served(speech_client):
+    client, _ = speech_client
+    r = client.get("/audio/fake.wav")
+    assert r.status_code == 200 and r.content == b"RIFFdata"
+    assert client.get("/audio/missing.wav").status_code == 404
+
+
+def test_audio_route_without_stt_is_501(client):
+    sid = client.post("/sessions", json=BODY).json()["session_id"]
+    r = client.post(f"/sessions/{sid}/audio", files={"audio": ("a.webm", b"x", "audio/webm")})
+    assert r.status_code == 501
