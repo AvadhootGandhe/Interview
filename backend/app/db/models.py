@@ -71,6 +71,54 @@ class CompanyProfile(Base):
     __table_args__ = (UniqueConstraint("company_id", "profile_id", "level_id"),)
 
 
+class InterviewSession(Base):
+    __tablename__ = "sessions"
+    id = Column(String, primary_key=True)
+    profile = Column(String, nullable=False)
+    level = Column(String)
+    company = Column(String)
+    topic = Column(String)
+    state = Column(String, nullable=False, default="active")  # active | done
+    current_index = Column(Integer, nullable=False, default=0)
+    followups_used = Column(Integer, nullable=False, default=0)
+    pool_json = Column(Text, nullable=False, default="[]")
+    company_summary = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Plan(Base):
+    __tablename__ = "plans"
+    id = Column(Integer, primary_key=True)
+    session_id = Column(ForeignKey("sessions.id"), nullable=False, index=True)
+    version = Column(Integer, nullable=False)
+    plan_json = Column(Text, nullable=False)
+    bridge = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Turn(Base):
+    __tablename__ = "turns"
+    id = Column(Integer, primary_key=True)
+    session_id = Column(ForeignKey("sessions.id"), nullable=False, index=True)
+    segment_index = Column(Integer, nullable=False)
+    kind = Column(String, nullable=False)  # greeting | ask | follow_up | answer | closing
+    role = Column(String, nullable=False)  # interviewer | candidate
+    text = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Evaluation(Base):
+    __tablename__ = "evaluations"
+    id = Column(Integer, primary_key=True)
+    session_id = Column(ForeignKey("sessions.id"), nullable=False, index=True)
+    segment_index = Column(Integer, nullable=False)
+    attempt = Column(Integer, nullable=False)
+    satisfaction = Column(Integer, nullable=False)
+    final_score = Column(Integer)  # set on the attempt that closed the question
+    data_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 # FTS5 keyword index over question text; rowid == questions.id.
 event.listen(
     Base.metadata,
