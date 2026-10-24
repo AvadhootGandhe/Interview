@@ -118,3 +118,12 @@ class Plan(Base):
     session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), index=True)
     plan_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class SessionState(Base):
+    """Everything the orchestrator needs to resume an interview (no in-memory session state)."""
+
+    __tablename__ = "session_states"
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), primary_key=True)
+    state_json: Mapped[str] = mapped_column(Text, default="{}")
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)

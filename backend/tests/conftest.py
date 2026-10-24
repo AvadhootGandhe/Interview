@@ -102,3 +102,41 @@ def db(db_url):
     with Session(engine) as session:
         yield session
     engine.dispose()
+
+
+# --- Phase 3: routed fake LLM -------------------------------------------------
+
+class RoutedLLM:
+    """Fake Claude that answers by `task=` kwarg.
+
+    routes[task] is a list (popped in order), a string (always returned) or a callable
+    `(prompt, **kwargs) -> str`. Tasks with no route go to `fallback` (a DemoLLM by default).
+    """
+
+    def __init__(self, routes: dict | None = None, fallback=None) -> None:
+        from app.llm.fake import DemoLLM
+
+        self.routes = dict(routes or {})
+        self.fallback = fallback if fallback is not None else DemoLLM()
+        self.calls: list[dict] = []
+
+    def calls_for(self, task: str) -> list[dict]:
+        return [c for c in self.calls if c.get("task") == task]
+
+    async def complete(self, prompt: str, **kwargs) -> str:
+        self.calls.append({"prompt": prompt, **kwargs})
+        route = self.routes.get(kwargs.get("task"))
+        if route is None:
+            return await self.fallback.complete(prompt, **kwargs)
+        if callable(route):
+            return route(prompt, **kwargs)
+        if isinstance(route, str):
+            return route
+        if not route:
+            raise AssertionError(f"RoutedLLM ran out of replies for task {kwargs.get('task')!r}")
+        return route.pop(0)
+
+
+@pytest.fixture
+def routed_llm() -> RoutedLLM:
+    return RoutedLLM()

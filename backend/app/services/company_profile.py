@@ -120,7 +120,9 @@ class CompanyProfileService:
             topic_mix="\n".join(f"- {m['topic']}: {m['percent']}%" for m in mix[:15]),
             questions="\n".join(f"- {q}" for q in questions),
         )
-        raw = await self.llm.complete(prompt, max_tokens=settings.profile_summary_max_tokens)
+        raw = await self.llm.complete(
+            prompt, task="company_profile", model=settings.cheap_model, max_tokens=settings.profile_summary_max_tokens
+        )
         lines = [line.strip() for line in raw.strip().splitlines() if line.strip()]
         if not lines:
             raise ValueError("empty summary")
