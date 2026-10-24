@@ -109,7 +109,7 @@ models/    🖥 git-ignored (GGUF)
   <|im_start|>system\nYou are a technical interviewer. Ask exactly one interview question that matches the requested profile, experience level and topic.<|im_end|>\n<|im_start|>user\nProfile: {profile}\nLevel: {level}\nTopic: {topic}\n\nAsk one interview question.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n
   ```
 - `scripts/check_model.py`: prints 3 questions.
-- ⚠ Training used `by_profile_level_topic.json`, which is not in the repo. Confirm its profile, level and topic names match the company file.
+- ✅ Training used `by_profile_level_topic.json` (not in the repo). Its structure file (8 profiles, 5 levels, 402 topics, no company, no slugs) matches the company file's counts. Still spot-check the exact names on the Mac.
 
 **Status:** [x] unit tests + `local_client.py`, `question_generator.py`, `check_model.py`, live test written (cloud). 🖥 GGUF export and live run still to do on the Mac.
 
@@ -152,6 +152,8 @@ models/    🖥 git-ignored (GGUF)
 - `app/services/company_profile.py`: topic mix by SQL, plus a 3–4 line focus/style summary from about 30 sample questions (Claude Haiku via `claude_client`), cached in the DB.
 - `app/services/context_pack.py`: builds the pack the planner and interviewer receive.
 - `app/api/catalog.py`.
+
+**Status:** [x] ingest, retriever (+FTS5), company profile, context pack, catalog API — all tested on the sample (cloud). 🖥 full-dataset ingest and timing still to do on the Mac.
 
 **Done when:** tests are green. 🖥 Full ingest finishes in under 15 min with about 131K questions and about 3.86M mappings. `Amazon / AI Engineer / Architect/Principal / AI Agents & Tool Calling` returns the expected pool, and FTS for "idempotency" returns relevant questions in under 50 ms.
 
