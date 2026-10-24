@@ -1,9 +1,12 @@
 """Shared fixtures: fake LLM, STT and TTS so cloud runs need no model, mic or key."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
+
+os.environ.setdefault("SPEECH", "off")  # tests never load real engines; they override the deps
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE_QUESTIONS = REPO_ROOT / "data" / "sample_questions.json"

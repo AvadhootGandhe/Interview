@@ -14,7 +14,7 @@ import json
 import time
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -82,6 +82,7 @@ class Reply:
     total_questions: int
     messages: list[dict]
     evaluation: Evaluation | None = None
+    timings: dict[str, float] = field(default_factory=dict)  # stage -> ms (Server-Timing)
 
 
 def _summary(ev: Evaluation) -> str:
@@ -113,6 +114,17 @@ class Orchestrator:
         self.followup_log = Path(followup_log or settings.followup_log_path or REPO_ROOT / "data" / "followup_train.jsonl")
         self.clock = clock
         self.interviewer = Interviewer(llm)
+        self.timings: dict[str, float] = {}
+
+    async def _say(self, inp: InterviewerInput) -> str:
+        return await self._timed("interviewer", self.interviewer.run(inp))
+
+    async def _timed(self, stage: str, coro):
+        t0 = time.perf_counter()
+        try:
+            return await coro
+        finally:
+            self.timings[stage] = self.timings.get(stage, 0.0) + (time.perf_counter() - t0) * 1000
 
     # --- persistence -----------------------------------------------------------
 
@@ -182,6 +194,7 @@ class Orchestrator:
             session_id=session.id, text=" ".join(m["text"] for m in messages), kind=kind, state=session.state,
             done=session.state == "done", question_index=min(state.idx, len(state.plan.segments) - 1),
             total_questions=len(state.plan.segments), messages=messages, evaluation=evaluation,
+            timings=dict(self.timings),
         )
 
     def _log_followup(self, session: InterviewSession, seed: PoolItem, thread: list[Msg],
@@ -205,8 +218,9 @@ class Orchestrator:
     # --- public API --------------------------------------------------------------
 
     async def start(self, filters: Filters, user_id: str | None = None) -> Reply:
-        pack = await self.pack_builder(self.db, filters, llm=self.llm, generator=self.generator, user_id=user_id)
-        plan = await Planner(self.llm).run(pack)
+        pack = await self._timed("retrieve", self.pack_builder(
+            self.db, filters, llm=self.llm, generator=self.generator, user_id=user_id))
+        plan = await self._timed("plan", Planner(self.llm).run(pack))
         session = InterviewSession(
             id=uuid.uuid4().hex, user_id=user_id, profile=filters.profile, level=filters.level,
             company=filters.company, topic=filters.topic, state="asking",
@@ -219,8 +233,8 @@ class Orchestrator:
         seed = next(p for p in state.items() if p.id == plan.segments[0].seed_question_id)
 
         base = self._closing_input(session, state)
-        greeting = await self.interviewer.run(InterviewerInput(**{**base.__dict__, "mode": "greeting"}))
-        question = await self.interviewer.run(self._ask_input(session, state, "ask", seed, None, ""))
+        greeting = await self._say(InterviewerInput(**{**base.__dict__, "mode": "greeting"}))
+        question = await self._say(self._ask_input(session, state, "ask", seed, None, ""))
 
         self.db.add(session)
         self.db.flush()
@@ -241,8 +255,8 @@ class Orchestrator:
         seed = next(p for p in pool if p.id == seg.seed_question_id)
 
         thread = self._thread(session_id, seed.id) + [Msg("candidate", text)]
-        evaluation = await Evaluator(self.llm).run(EvalInput(
-            question=seed.text, thread=thread, profile=session.profile, level=session.level, topic=seed.topic))
+        evaluation = await self._timed("evaluate", Evaluator(self.llm).run(EvalInput(
+            question=seed.text, thread=thread, profile=session.profile, level=session.level, topic=seed.topic)))
         state.open_eval = evaluation
         sat = evaluation.satisfaction
 
@@ -250,7 +264,7 @@ class Orchestrator:
         if sat < settings.satisfaction_threshold and state.followups < settings.max_followups:
             inp = self._ask_input(session, state, "follow_up", seed, None, _summary(evaluation))
             inp.follow_up_focus, inp.missing_points = evaluation.follow_up_focus, evaluation.missing_points
-            follow_up = await self.interviewer.run(inp)
+            follow_up = await self._say(inp)
             state.followups += 1
             self._persist_answer(session, seed, text, evaluation)
             self._turn(session_id, "interviewer", "follow_up", follow_up, seed.id)
@@ -271,7 +285,7 @@ class Orchestrator:
 
         last = state.idx + 1 >= len(state.plan.segments)
         if last or self._time_is_up(state):
-            closing = await self.interviewer.run(self._closing_input(session, state))
+            closing = await self._say(self._closing_input(session, state))
             self._persist_answer(session, seed, text, evaluation)
             self._turn(session_id, "interviewer", "closing", closing)
             session.state = "done"
@@ -279,13 +293,15 @@ class Orchestrator:
             self.db.commit()
             return self._reply(session, state, "closing", [{"kind": "closing", "text": closing}], evaluation)
 
+        t0 = time.perf_counter()
         decision = next_segment(state.plan, state.idx, state.asked, evaluation, final, pool, search=self.search)
+        self.timings["flow"] = (time.perf_counter() - t0) * 1000
         plan_changed = decision.plan is not state.plan
         state.plan = decision.plan
         state.idx += 1
         nxt = next(p for p in pool if p.id == decision.segment.seed_question_id)
         mode = "transition" if weak_finish else "ask"
-        question = await self.interviewer.run(self._ask_input(session, state, mode, nxt, decision.bridge, summary))
+        question = await self._say(self._ask_input(session, state, mode, nxt, decision.bridge, summary))
         self._persist_answer(session, seed, text, evaluation)
         self._turn(session_id, "interviewer", "ask", question, nxt.id)
         self._save(session_id, state, plan_changed=plan_changed)
@@ -309,7 +325,7 @@ class Orchestrator:
                 question_id=seed.id, topic=seed.topic, text=seed.text, score=final,
                 follow_ups=state.followups, evaluation=state.open_eval))
             state.open_eval = None
-        closing = await self.interviewer.run(self._closing_input(session, state))
+        closing = await self._say(self._closing_input(session, state))
         self._turn(session_id, "interviewer", "closing", closing)
         session.state = "done"
         self._save(session_id, state)
