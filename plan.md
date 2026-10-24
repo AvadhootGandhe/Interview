@@ -244,6 +244,12 @@ models/    🖥 git-ignored (GGUF)
 
 **Done when:** tests are green. 🖥 A recorded answer goes in and spoken interviewer audio comes out.
 
+**Status:**
+- [x] `tests/test_stt.py`, `tests/test_tts.py`, `tests/test_api_audio.py` written first (26 tests), then `app/speech/stt.py`, `app/speech/tts.py`, `app/api/audio.py` (registered in `app/main.py`). Cloud suite: 145 green.
+- [x] 🖥 Live: `tests/test_speech_live.py` (marked local). mlx-whisper `whisper-base.en-mlx` on `tests/fixtures/hello.wav` (made with `say` + ffmpeg, 139 KB): WER 0.0 (limit 15%). Kokoro-82M voice `af_heart`: 0.44 s for one sentence after warm-up (limit 1 s). Mac-only deps in `backend/requirements-local.txt`.
+- [ ] `tests/test_api_sessions.py`: the answer endpoint accepts multipart audio (owned by the Phase 3 sessions API; wire `SpeechToText` and `TextToSpeech` into it, same interface as `FakeSTT`/`FakeTTS`).
+- [ ] 🖥 End to end: a recorded browser answer (webm) in, spoken interviewer audio out (needs the sessions API and frontend; ffmpeg conversion of webm is only unit-tested with a fake).
+
 ---
 
 ## Phase 5: Frontend (Apple-minimal)
